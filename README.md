@@ -1,6 +1,15 @@
 # 🚌 NoufirTours
 
-> A comprehensive trip management and booking system built with ASP.NET Core MVC (.NET 10).
+<p align="center">
+  <img src="https://img.shields.io/badge/ASP.NET_Core-MVC-512BD4?style=for-the-badge&logo=dotnet&logoColor=white">
+  <img src="https://img.shields.io/badge/C%23-.NET_10-239120?style=for-the-badge&logo=csharp&logoColor=white">
+  <img src="https://img.shields.io/badge/Entity_Framework-Core-6C3483?style=for-the-badge">
+  <img src="https://img.shields.io/badge/SQL_Server-Database-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white">
+  <img src="https://img.shields.io/badge/QRCoder-QR_Tickets-2E86C1?style=for-the-badge">
+  <img src="https://img.shields.io/badge/ClosedXML-Excel_Export-217346?style=for-the-badge&logo=microsoftexcel&logoColor=white">
+  <img src="https://img.shields.io/badge/Cookie-Authentication-E67E22?style=for-the-badge&logo=shield&logoColor=white">
+  <img src="https://img.shields.io/badge/HTML%2FCSS%2FJS-Frontend-F39C12?style=for-the-badge&logo=html5&logoColor=white">
+</p>
 
 ---
 
@@ -50,6 +59,7 @@
 | Technology | Description |
 |---|---|
 | **ASP.NET Core MVC** | Main framework (.NET 10) |
+| **C#** | Backend development |
 | **Entity Framework Core** | Database access (ORM) |
 | **SQL Server** | Primary database |
 | **Cookie Authentication** | Authentication system |
@@ -131,3 +141,9 @@ NoufirTours/
 **Tomas Makram**
 
 - GitHub: [@Tomas-Makram](https://github.com/Tomas-Makram)
+
+---
+
+## ⭐ Support
+
+If you like this project, give it a ⭐ on GitHub!
