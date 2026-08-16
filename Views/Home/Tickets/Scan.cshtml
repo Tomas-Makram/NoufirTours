@@ -1,0 +1,314 @@
+﻿@using System.Globalization
+@model NoufirTours.Models.Home.TicketScanModel
+@{
+    ViewData["Title"] = "Ticket Scan";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    string V(string? x) => string.IsNullOrWhiteSpace(x) ? "-" : x.Trim();
+    string Money(decimal v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    string UnixToLocal(long unix)
+    {
+        try
+        {
+            var dt = DateTimeOffset.FromUnixTimeSeconds(unix).ToLocalTime().DateTime;
+            return dt.ToString("yyyy-MM-dd HH:mm");
+        }
+        catch { return "-"; }
+    }
+
+    var booking = Model.Booking;
+}
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <div class="brand mb-1">
+                <span class="brand-noufir">Noufir</span><span class="brand-tours">Tours</span>
+            </div>
+            <h3 class="mb-0">Ticket Verification</h3>
+        </div>
+        <a asp-controller="Home"
+           asp-action="Index"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-danger border-0 shadow-sm">
+            <i class="bi bi-exclamation-triangle me-1"></i> @Model.Error
+        </div>
+    }
+
+    <div class="row g-3">
+        <!-- LEFT: Scanner -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-body d-flex align-items-center justify-content-between">
+                    <div class="fw-semibold">
+                        <i class="bi bi-qr-code-scan me-1"></i> QR Scanner
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" id="btnStart" class="btn btn-sm btn-primary">
+                            <i class="bi bi-camera me-1"></i> Start
+                        </button>
+                        <button type="button" id="btnStop" class="btn btn-sm btn-outline-danger" disabled>
+                            <i class="bi bi-stop-circle me-1"></i> Stop
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-body">
+
+                    <div id="qrWrap" class="qr-wrap">
+                        <div id="qrReader"></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Form -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-body fw-semibold">
+                    <i class="bi bi-shield-check me-1"></i> Verify Ticket
+                </div>
+                <div class="card-body">
+                    <form asp-action="Scan" asp-controller="Home" method="post" autocomplete="off">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            <label class="form-label">Booking ID (GUID from QR or manual)</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-hash"></i></span>
+                                <input id="BookingIdRaw" name="BookingIdRaw" value="@Model.BookingIdRaw"
+                                       class="form-control"
+                                       placeholder="QR Code or Tiket ID" />
+                                <button type="button" id="btnPaste" class="btn btn-outline-secondary" title="Paste from clipboard">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success w-100">
+                            <i class="bi bi-check2-circle me-1"></i> Verify & Show Details
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESULT -->
+    @if (Model.HasResult && booking != null)
+    {
+        <div class="mt-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <h4 class="mb-0"><i class="bi bi-receipt me-1"></i> Booking Details</h4>
+                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Verified</span>
+
+                    @if (Model.Go?.IsArchived == true || Model.Return?.IsArchived == true)
+                    {
+                        <span class="badge bg-danger"><i class="bi bi-archive me-1"></i> Archived</span>
+                    }
+                </div>
+
+                <div class="small text-muted">
+                    Booking: <span class="fw-semibold">@booking.Id</span>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- Booking Header Card -->
+                <div class="col-12">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Company From</div>
+                                    <div class="fw-semibold">@V(booking.CompanyFrom)</div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Customer</div>
+                                    <div class="fw-semibold">@V(booking.CustomerName)</div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Phone</div>
+                                    <div class="fw-semibold">@V(booking.Phone)</div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Created At</div>
+                                    <div class="fw-semibold">@UnixToLocal(booking.CreatedAtUnix)</div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Total</div>
+                                    <div class="fw-semibold">@Money(booking.TotalAmount)</div>
+                                </div>
+
+                                <div class="col-12">
+                                    <hr class="my-2" />
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <span class="badge rounded-pill text-bg-primary">
+                                            @(Model.IsRound ? "ROUND" : "ONE WAY")
+                                        </span>
+                                        @if (Model.Go?.IsArchived == true)
+                                        {
+                                            <span class="badge rounded-pill text-bg-danger">GO Archived: @Model.Go.ArchiveReason</span>
+                                        }
+                                        @if (Model.Return?.IsArchived == true)
+                                        {
+                                            <span class="badge rounded-pill text-bg-danger">RETURN Archived: @Model.Return.ArchiveReason</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GO Segment -->
+                <div class="col-12">
+                    @await Html.PartialAsync("~/Views/Home/Tickets/_ScanTripSegment.cshtml", Model.Go)
+                </div>
+
+                <!-- RETURN Segment if Round -->
+                @if (Model.Return != null)
+                {
+                    <div class="col-12">
+                        @await Html.PartialAsync("~/Views/Home/Tickets/_ScanTripSegment.cshtml", Model.Return)
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style nonce="@nonce">
+    .brand {
+        font-weight: 900;
+        letter-spacing: .3px;
+        font-size: 20px;
+        line-height: 1;
+    }
+
+    .brand-noufir {
+        color: #0d6efd;
+    }
+
+    .brand-tours {
+        color: #ffc107;
+        margin-left: 6px;
+    }
+
+    .qr-wrap {
+        border: 1px dashed rgba(0,0,0,.18);
+        border-radius: 14px;
+        padding: 10px;
+        background: rgba(13,110,253,.03);
+        min-height: 260px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #qrReader {
+        width: 100%;
+        max-width: 420px;
+    }
+
+    /* Dark mode tweaks */
+    [data-bs-theme="dark"] .qr-wrap {
+        background: rgba(13,110,253,.10);
+        border-color: rgba(255,255,255,.12);
+    }
+</style>
+
+<script nonce="@nonce" src="~/lib/html5-qrcode/html5-qrcode.min.js"></script>
+
+<script nonce="@nonce">
+    (function () {
+        const bookingInput = document.getElementById("BookingIdRaw");
+        const btnStart = document.getElementById("btnStart");
+        const btnStop = document.getElementById("btnStop");
+        const btnPaste = document.getElementById("btnPaste");
+
+        let scanner = null;
+
+        function extractGuid(raw) {
+            if (!raw) return "";
+            raw = (raw + "").trim();
+
+            const exact = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+            if (exact.test(raw)) return raw;
+
+            const m = raw.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
+            if (m && m[0]) return m[0];
+
+            return "";
+        }
+
+        async function startScan() {
+            if (typeof Html5Qrcode === "undefined") {
+                alert("html5-qrcode not loaded. Put it in wwwroot/lib/html5-qrcode/html5-qrcode.min.js");
+                return;
+            }
+
+            btnStart.disabled = true;
+
+            scanner = new Html5Qrcode("qrReader");
+            try {
+                await scanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 240, height: 240 } },
+                    async (decodedText) => {
+                        const guid = extractGuid(decodedText);
+                        if (guid) {
+                            bookingInput.value = guid;
+                            await stopScan();
+                        }
+                    },
+                    (err) => { /* ignore */ }
+                );
+
+                btnStop.disabled = false;
+            } catch (e) {
+                console.error(e);
+                alert("Failed to start camera. Check HTTPS/permissions.");
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+                scanner = null;
+            }
+        }
+
+        async function stopScan() {
+            if (!scanner) return;
+            try { await scanner.stop(); await scanner.clear(); } catch (e) { }
+            scanner = null;
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+        }
+
+        btnStart?.addEventListener("click", startScan);
+        btnStop?.addEventListener("click", stopScan);
+
+        btnPaste?.addEventListener("click", async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                const guid = extractGuid(text);
+                if (guid) bookingInput.value = guid;
+                else alert("Clipboard does not contain a valid Booking GUID.");
+            } catch (e) {
+                alert("Clipboard not available in this browser.");
+            }
+        });
+    })();
+</script>

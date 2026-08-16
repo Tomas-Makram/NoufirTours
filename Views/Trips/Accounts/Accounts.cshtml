@@ -1,0 +1,103 @@
+﻿@model NoufirTours.Models.Trips.Accounts.UsersListModel
+@{
+    ViewData["Title"] = "Accounts";
+}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="mb-0">Users</h3>
+            <div class="text-muted small">Manage accounts (Admins/Staff/Drivers)</div>
+        </div>
+
+        <a asp-action="UserCreate" asp-controller="Trips" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Add New Account
+        </a>
+    </div>
+
+    <form method="get" asp-action="Accounts" asp-controller="Trips" class="card card-body mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label">Search</label>
+                <input name="q" value="@Model.Q" class="form-control" placeholder="username / full name / phone" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Filter</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="onlystaffs" value="true" @(Model.OnlyAdmins ? "checked" : "") id="onlyAdmins" />
+                    <label class="form-check-label" for="onlyAdmins">Staffs only</label>
+                </div>
+                <input asp-for="IncludeInactive" class="form-check-input" />
+                <label asp-for="IncludeInactive" class="form-check-label">Include inactive</label>
+            </div>
+
+            <div class="col-md-4 d-flex gap-2">
+                <button class="btn btn-outline-primary flex-grow-1" type="submit">
+                    <i class="bi bi-search me-1"></i> Search
+                </button>
+                <a class="btn btn-outline-secondary" asp-action="Accounts" asp-controller="Trips">Reset</a>
+            </div>
+        </div>
+    </form>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Role</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Last Login (Cairo)</th>
+                        <th>Total Due</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Items.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">No users found.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var u in Model.Items)
+                        {
+                            <tr>
+                                <td>@u.Username</td>
+                                <td>@(string.IsNullOrWhiteSpace(u.FullName) ? "-" : u.FullName)</td>
+                                <td><span class="badge bg-secondary">@u.RoleText</span></td>
+                                <td>@(string.IsNullOrWhiteSpace(u.Phone) ? "-" : u.Phone)</td>
+                                <td>
+                                    @if (u.IsActive)
+                                    {
+                                        <span class="badge bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Inactive</span>
+                                    }
+                                </td>
+                                <td>@(u.LastLoginCairo.HasValue? u.LastLoginCairo.Value.ToString("yyyy-MM-dd HH:mm") : "-")</td>
+                                <td>@(u.TotalDue)</td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       asp-action="UserDetails" asp-controller="Trips" asp-route-id="@u.UserID">
+                                        Details
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

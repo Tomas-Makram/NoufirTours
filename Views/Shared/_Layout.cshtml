@@ -1,0 +1,828 @@
+﻿@using Microsoft.AspNetCore.Http
+@{
+    var themeCookie = Context.Request.Cookies["AppTheme"];
+    var isDark = string.Equals(themeCookie, "dark", StringComparison.OrdinalIgnoreCase);
+
+    var userId = Context.Session.GetInt32("UserID");
+    var isLoggedIn = userId.HasValue;
+
+    var userName = Context.Session.GetString("UserName") ?? "User";
+    var userRole = (Context.Session.GetString("UserRole") ?? "staff").ToLowerInvariant();
+    bool isAdmin = userRole == "admin";
+    bool isStaff = userRole == "staff";
+
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? "").ToLowerInvariant();
+    var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? "").ToLowerInvariant();
+
+    bool IsActive(string controller, string action)
+        => currentController == controller.ToLowerInvariant()
+           && currentAction == action.ToLowerInvariant();
+}
+
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="@(isDark ? "dark" : "light")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - NoufirTours</title>
+
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/NoufirTours.styles.css" asp-append-version="true" />
+
+    <style>
+        :root {
+            --nt-blue: #1a73ff;
+            --nt-yellow: #ffcc00;
+            --nt-text: rgba(0,0,0,.86);
+            --nt-muted: rgba(0,0,0,.62);
+            --nt-glass: rgba(255,255,255,.62);
+            --nt-card: rgba(255,255,255,.78);
+            --nt-border: rgba(0,0,0,.08);
+            --nt-shadow: 0 18px 55px rgba(0,0,0,.12);
+            --nt-shadow2: 0 10px 25px rgba(0,0,0,.10);
+            --nt-radius: 22px;
+        }
+
+        [data-bs-theme="dark"] {
+            --nt-text: rgba(255,255,255,.92);
+            --nt-muted: rgba(255,255,255,.70);
+            --nt-glass: rgba(14,14,14,.58);
+            --nt-card: rgba(18,18,18,.72);
+            --nt-border: rgba(255,255,255,.10);
+            --nt-shadow: 0 22px 75px rgba(0,0,0,.62);
+            --nt-shadow2: 0 12px 35px rgba(0,0,0,.45);
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: var(--nt-text);
+            background: radial-gradient(900px 520px at 15% 15%, rgba(26,115,255,.18), transparent 60%), radial-gradient(900px 520px at 85% 80%, rgba(255,204,0,.18), transparent 60%), linear-gradient(180deg, rgba(26,115,255,.06), rgba(255,204,0,.05));
+        }
+
+        [data-bs-theme="dark"] body {
+            background: radial-gradient(900px 520px at 15% 15%, rgba(26,115,255,.16), transparent 60%), radial-gradient(900px 520px at 85% 80%, rgba(255,204,0,.10), transparent 60%), linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.35));
+        }
+
+        .nt-bg-grain {
+            pointer-events: none;
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            opacity: .06;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+        }
+
+        .nt-root {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        .nt-navbar {
+            position: sticky;
+            top: 0;
+            z-index: 1030;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            background: var(--nt-glass);
+            border-bottom: 1px solid var(--nt-border);
+            transition: box-shadow .25s ease;
+        }
+
+            .nt-navbar.nt-scrolled {
+                box-shadow: var(--nt-shadow2);
+            }
+
+        .nt-brand {
+            display: flex;
+            align-items: center;
+            gap: .7rem;
+            font-weight: 900;
+            letter-spacing: .2px;
+        }
+
+            .nt-brand img {
+                width: 42px;
+                height: 42px;
+                border-radius: 16px;
+                object-fit: cover;
+                box-shadow: 0 14px 30px rgba(0,0,0,.16);
+            }
+
+        .nt-brand-title {
+            font-weight: 950;
+            letter-spacing: .2px;
+        }
+
+        .nt-brand-blue {
+            color: var(--nt-blue);
+        }
+
+        .nt-brand-yellow {
+            color: var(--nt-yellow);
+        }
+
+        .nt-brand-title:hover .nt-brand-blue,
+        .nt-brand-title:hover .nt-brand-yellow {
+            filter: brightness(1.05);
+        }
+
+        .nt-navlink {
+            position: relative;
+            font-weight: 800;
+            opacity: .9;
+            padding: .55rem .8rem !important;
+            border-radius: 14px;
+            transition: transform .18s ease, opacity .18s ease, background .18s ease;
+        }
+
+            .nt-navlink:hover {
+                transform: translateY(-1px);
+                opacity: 1;
+                background: rgba(26,115,255,.08);
+            }
+
+        [data-bs-theme="dark"] .nt-navlink:hover {
+            background: rgba(26,115,255,.14);
+        }
+
+        .nt-navlink.nt-active {
+            opacity: 1 !important;
+            background: rgba(255,204,0,.22) !important;
+            border: 1px solid rgba(255,204,0,.48) !important;
+            color: var(--nt-yellow) !important;
+            box-shadow: 0 12px 26px rgba(255,204,0,.18);
+        }
+
+        .nt-page {
+            padding: 18px 0 26px;
+            flex: 1;
+        }
+
+        .nt-shell {
+            border-radius: var(--nt-radius);
+            background: rgba(255,255,255,.48);
+            border: 1px solid rgba(0,0,0,.06);
+            box-shadow: 0 14px 45px rgba(0,0,0,.06);
+            padding: 18px;
+        }
+
+        [data-bs-theme="dark"] .nt-shell {
+            background: rgba(18,18,18,.38);
+            border-color: rgba(255,255,255,.08);
+            box-shadow: 0 14px 55px rgba(0,0,0,.35);
+        }
+
+        .nt-fab {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 1400;
+        }
+
+        .nt-fabbtn {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(0,0,0,.08);
+            background: rgba(255,255,255,.68);
+            box-shadow: 0 18px 55px rgba(0,0,0,.16);
+            backdrop-filter: blur(12px);
+        }
+
+        [data-bs-theme="dark"] .nt-fabbtn {
+            background: rgba(18,18,18,.60);
+            box-shadow: 0 18px 70px rgba(0,0,0,.55);
+        }
+
+        /* =========================
+                       ✅ LOADER (BALL STYLE)
+                   ========================= */
+        .nt-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(900px 520px at 15% 15%, rgba(26,115,255,.18), transparent 60%), radial-gradient(900px 520px at 85% 80%, rgba(255,204,0,.18), transparent 60%), rgba(0,0,0,.35);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            opacity: 0;
+            transition: opacity .18s ease;
+            pointer-events: none;
+        }
+
+            .nt-loader.nt-on {
+                display: flex;
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+        .nt-loader-wrap {
+            width: min(520px, 92vw);
+            text-align: center;
+            position: relative;
+        }
+
+        .nt-logo-glow {
+            position: absolute;
+            left: 50%;
+            top: 46%;
+            transform: translate(-50%,-50%);
+            width: min(320px, 88vw);
+            height: min(200px, 50vw);
+            border-radius: 999px;
+            background: radial-gradient(circle at 35% 40%, rgba(26,115,255,.22), transparent 60%), radial-gradient(circle at 65% 55%, rgba(255,204,0,.20), transparent 62%);
+            filter: blur(14px);
+            opacity: .85;
+            z-index: -1;
+        }
+
+        /* ✅ دائرة صغيرة (الكورة) */
+        .nt-logo-loader {
+            position: relative;
+            width: 132px;
+            height: 132px;
+            margin: 0 auto;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+        }
+
+        /* الحلقة اللي بتلف: الأزرق والأصفر */
+        .nt-ball-ring {
+            position: absolute;
+            inset: -10px;
+            border-radius: 999px;
+            background: conic-gradient(from 180deg, rgba(26,115,255,.00) 0deg, rgba(26,115,255,.95) 70deg, rgba(255,204,0,.95) 150deg, rgba(26,115,255,.90) 240deg, rgba(26,115,255,.00) 360deg);
+            opacity: .98;
+            /* نخليها حلقة مش قرص */
+            mask: radial-gradient(circle at 50% 50%, transparent 64%, #000 65%);
+            -webkit-mask: radial-gradient(circle at 50% 50%, transparent 64%, #000 65%);
+            animation: ntSpinBall 1.05s linear infinite;
+            filter: drop-shadow(0 18px 35px rgba(0,0,0,.20));
+            pointer-events: none;
+        }
+
+        /* جسم الكورة (خلفية خفيفة) */
+        .nt-ball-core {
+            width: 110px;
+            height: 110px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.16);
+            border: 1px solid rgba(255,255,255,.18);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: grid;
+            place-items: center;
+            box-shadow: 0 18px 45px rgba(0,0,0,.18);
+        }
+
+        [data-bs-theme="dark"] .nt-ball-core {
+            background: rgba(18,18,18,.20);
+            border-color: rgba(255,255,255,.14);
+            box-shadow: 0 18px 55px rgba(0,0,0,.45);
+        }
+
+        /* لوجو الشركة جوه الكورة */
+        .nt-ball-core img {
+            width: 66px;
+            height: 66px;
+            border-radius: 18px;
+            object-fit: cover;
+            display: block;
+            box-shadow: 0 12px 26px rgba(0,0,0,.18);
+        }
+
+        .nt-waves {
+            width: min(320px, 72vw);
+            height: 28px;
+            margin: 10px auto 0;
+            position: relative;
+            overflow: hidden;
+            opacity: .95;
+        }
+
+            .nt-waves::before,
+            .nt-waves::after {
+                content: "";
+                position: absolute;
+                left: -20%;
+                width: 140%;
+                height: 100%;
+                background: radial-gradient(circle at 10% 70%, rgba(26,115,255,.0) 0 14px, rgba(26,115,255,.75) 15px 16px, rgba(26,115,255,.0) 17px 100%), radial-gradient(circle at 35% 60%, rgba(26,115,255,.0) 0 14px, rgba(26,115,255,.75) 15px 16px, rgba(26,115,255,.0) 17px 100%), radial-gradient(circle at 60% 70%, rgba(26,115,255,.0) 0 14px, rgba(26,115,255,.75) 15px 16px, rgba(26,115,255,.0) 17px 100%), radial-gradient(circle at 85% 60%, rgba(26,115,255,.0) 0 14px, rgba(26,115,255,.75) 15px 16px, rgba(26,115,255,.0) 17px 100%);
+                transform: translateX(0);
+                animation: ntWave 1.25s linear infinite;
+                opacity: .85;
+            }
+
+            .nt-waves::after {
+                top: 10px;
+                opacity: .55;
+                animation-duration: 1.55s;
+            }
+
+        .nt-loader-text {
+            margin-top: 10px;
+            color: rgba(255,255,255,.92);
+            font-weight: 900;
+            letter-spacing: .2px;
+            text-shadow: 0 10px 30px rgba(0,0,0,.35);
+        }
+
+        .nt-loader-sub {
+            margin-top: 6px;
+            color: rgba(255,255,255,.75);
+            font-weight: 800;
+        }
+
+        .nt-progress {
+            width: min(360px, 84vw);
+            margin: 14px auto 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nt-progress-track {
+            flex: 1;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.16);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,.18);
+        }
+
+        #ntProgressBar {
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #1a73ff, #ffcc00);
+            transition: width .12s ease;
+            position: relative;
+        }
+
+            #ntProgressBar::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+                transform: translateX(-60%);
+                animation: ntShimmer 1.05s linear infinite;
+                opacity: .6;
+            }
+
+        #ntProgressPct {
+            width: 52px;
+            text-align: right;
+            color: rgba(255,255,255,.9);
+            font-weight: 950;
+        }
+
+        @@keyframes ntSpinBall {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @@keyframes ntWave {
+            from {
+                transform: translateX(0);
+            }
+
+            to {
+                transform: translateX(18%);
+            }
+        }
+
+        @@keyframes ntShimmer {
+            0% {
+                transform: translateX(-65%);
+            }
+
+            100% {
+                transform: translateX(65%);
+            }
+        }
+
+        footer {
+            margin-top: auto;
+            background: rgba(255,255,255,.30);
+            border-top: 1px solid rgba(0,0,0,.06) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        [data-bs-theme="dark"] footer {
+            background: rgba(18,18,18,.25);
+            border-top-color: rgba(255,255,255,.08) !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="nt-bg-grain"></div>
+
+    <!-- ✅ LOADER (ball + logo) -->
+    <div class="nt-loader" id="ntLoader" aria-hidden="true">
+        <div class="nt-loader-wrap" role="status" aria-live="polite">
+            <div class="nt-logo-glow"></div>
+
+            <div class="nt-logo-loader">
+                <div class="nt-ball-ring" aria-hidden="true"></div>
+
+                <div class="nt-ball-core">
+                    <!-- نفس لوجو الشركة زي اللي فات -->
+                    <img src="~/Logo.jpg" alt="Noufir Tours"
+                         onerror="this.style.display='none';" />
+                </div>
+            </div>
+
+            <div class="nt-waves" aria-hidden="true"></div>
+
+            <div class="nt-loader-text" id="ntLoaderText">Loading…</div>
+            <div class="nt-loader-sub">Please wait</div>
+
+            <div class="nt-progress">
+                <div class="nt-progress-track" aria-hidden="true">
+                    <div id="ntProgressBar"></div>
+                </div>
+                <div id="ntProgressPct">0%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="nt-root">
+        <header class="nt-navbar" id="ntNavbar">
+            <nav class="navbar navbar-expand-lg">
+                <div class="container-fluid px-3 px-md-4 py-2">
+                    <a class="navbar-brand nt-brand" asp-controller="Home" asp-action="Index">
+                        <img src="~/Logo.jpg" alt="NoufirTours" onerror="this.style.display='none';" />
+                        <span class="nt-brand-title">
+                            <span class="nt-brand-blue">Noufir</span><span class="nt-brand-yellow">Tours</span>
+                        </span>
+                    </a>
+
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#ntNav"
+                            aria-controls="ntNav" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+
+                    <div class="collapse navbar-collapse" id="ntNav">
+                        <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-1 mt-3 mt-lg-0">
+                            @if (!isLoggedIn)
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link nt-navlink @(IsActive("Home", "Index") ? "nt-active" : "")"
+                                       asp-controller="Home" asp-action="Index">Home</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link nt-navlink @(IsActive("Home", "Privacy") ? "nt-active" : "")"
+                                       asp-controller="Home" asp-action="Privacy">Privacy</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link nt-navlink @(IsActive("Home", "Terms") ? "nt-active" : "")"
+                                       asp-controller="Home" asp-action="Terms">Terms</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link nt-navlink @(IsActive("Home", "Scan") ? "nt-active" : "")"
+                                       asp-controller="Home" asp-action="Scan">Ticket Scan</a>
+                                </li>
+                            }
+                            else
+                            {
+                                @if (isStaff)
+                                {
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Dashboard", "Index") ? "nt-active" : "")
+                                                                                      @(IsActive("Dashboard", "TripDetails") ? "nt-active" : "")"
+                                           asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                                    </li>
+
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Booking", "index") ? "nt-active" : "")
+                                                                                      @(IsActive("Booking", "Details") ? "nt-active" : "")"
+                                           asp-controller="Booking" asp-action="index">Booking Trips</a>
+                                    </li>
+
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Booking", "TecSup") ? "nt-active" : "")"
+                                           asp-controller="Booking" asp-action="TecSup">Technical Support</a>
+                                    </li>
+                                }
+                                @if (isAdmin)
+                                {
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Dashboard", "Index") ? "nt-active" : "")
+                                                                                      @(IsActive("Dashboard", "TripDetails") ? "nt-active" : "")"
+                                           asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Trips", "Trips") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "CreateNewTrip") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "EditTrip") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "TripDetails") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "AutoTripsSettings") ? "nt-active" : "")"
+                                           asp-controller="Trips" asp-action="Trips">Trips</a>
+                                    </li>
+
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Trips", "Buses") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "CreateNewBus") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "EditBus") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "BusDetails") ? "nt-active" : "")"
+                                           asp-controller="Trips" asp-action="Buses">Buses</a>
+                                    </li>
+
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Trips", "Drivers") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "CreateNewDriver") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "EditDriver") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "DriverDetails") ? "nt-active" : "")"
+                                           asp-controller="Trips" asp-action="Drivers">Drivers</a>
+                                    </li>
+
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Trips", "Accounts") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "UserCreate") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "UserDetails") ? "nt-active" : "")
+                                                                                                          @(IsActive("Trips", "UserToggleActive") ? "nt-active" : "")"
+                                           asp-controller="Trips" asp-action="Accounts">Accounts</a>
+                                    </li>
+
+                                    <li class="nav-item">
+                                        <a class="nav-link nt-navlink @(IsActive("Trips", "TecSup") ? "nt-active" : "")"
+                                           asp-controller="Trips" asp-action="TecSup">Technical Support</a>
+                                    </li>
+                                }
+                                <li class="nav-item">
+                                    <a class="nav-link nt-navlink @(IsActive("Home", "Settings") ? "nt-active" : "")"
+                                       asp-controller="Home" asp-action="Settings">Settings</a>
+                                </li>
+                            }
+                        </ul>
+
+                        <div class="d-flex align-items-center gap-2 mt-3 mt-lg-0">
+                            @if (!isLoggedIn)
+                            {
+                                <a class="btn btn-primary px-3 fw-bold" asp-controller="Auth" asp-action="Login">Login</a>
+                            }
+                            else
+                            {
+                                <div class="d-none d-md-flex align-items-center me-1">
+                                    <span class="opacity-75 small">Hi,</span>
+                                    <span class="ms-1 fw-semibold">@userName</span>
+                                    <span class="ms-2 badge rounded-pill @(isAdmin ? "text-bg-warning" : "text-bg-secondary")">@(userRole == "staff" ? "Company" : userRole)</span>
+                                </div>
+
+                                <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-danger px-3 fw-bold">Logout</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <div class="container nt-page">
+            <div class="nt-shell">
+                <main role="main" class="pb-2">
+                    @RenderBody()
+                </main>
+            </div>
+        </div>
+
+        <footer class="text-muted py-3">
+            <div class="container d-flex flex-column flex-md-row gap-2 justify-content-between align-items-center">
+                <div>&copy; @DateTime.Now.Year - NoufirTours</div>
+                <a class="text-muted text-decoration-none" asp-controller="Home" asp-action="Privacy">Privacy</a>
+            </div>
+        </footer>
+
+        <div class="nt-fab">
+            <form asp-controller="Theme" asp-action="ToggleTheme" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="nt-fabbtn" title="Toggle theme" aria-label="Toggle theme">
+                    @if (isDark)
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+                            <path d="M8 0a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 8 0z" />
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M6 0a7 7 0 1 0 7.906 8.273.5.5 0 0 0-.71-.55 6 6 0 0 1-7.65-7.65A.5.5 0 0 0 6 0z" />
+                        </svg>
+                    }
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script nonce="@nonce">
+        // Navbar shadow only
+        (function () {
+            const nav = document.getElementById('ntNavbar');
+            function onScroll() {
+                if (!nav) return;
+                nav.classList.toggle('nt-scrolled', window.scrollY > 6);
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <script nonce="@nonce">
+        // =========================
+        // ✅ Loader Controller (FIXED)
+        // - DO NOT show loader if form is invalid / prevented
+        // - Works with HTML5 validation + jQuery Unobtrusive (if present)
+        // - Respects data-nt-no-loader on form/button/link
+        // =========================
+        (function () {
+            const loader = document.getElementById("ntLoader");
+            const bar = document.getElementById("ntProgressBar");
+            const pct = document.getElementById("ntProgressPct");
+            const txt = document.getElementById("ntLoaderText");
+
+            let timer = null;
+            let value = 0;
+            let target = 92;
+            let running = false;
+
+            function set(v) {
+                value = Math.max(0, Math.min(100, v));
+                if (bar) bar.style.width = value.toFixed(0) + "%";
+                if (pct) pct.textContent = value.toFixed(0) + "%";
+            }
+
+            function startProgress() {
+                if (timer) clearInterval(timer);
+                running = true;
+                value = 0;
+                set(0);
+
+                timer = setInterval(() => {
+                    if (!running) return;
+                    if (value >= target) return;
+
+                    const boost =
+                        value < 25 ? 3 :
+                        value < 55 ? 2 :
+                        value < 75 ? 1.2 : 0.6;
+
+                    const jitter = (Math.random() * 0.8);
+                    set(value + boost + jitter);
+                }, 120);
+            }
+
+            function show(message) {
+                if (!loader) return;
+                if (typeof message === "string" && txt) txt.textContent = message;
+
+                loader.style.display = "flex";
+                requestAnimationFrame(() => loader.classList.add("nt-on"));
+                loader.setAttribute("aria-hidden", "false");
+                startProgress();
+            }
+
+            function hide() {
+                running = false;
+                if (timer) { clearInterval(timer); timer = null; }
+
+                set(100);
+
+                setTimeout(() => {
+                    if (!loader) return;
+                    loader.classList.remove("nt-on");
+                    loader.style.display = "none";
+                    loader.setAttribute("aria-hidden", "true");
+
+                    target = 92;
+                    setTimeout(() => set(0), 180);
+                }, 240);
+            }
+
+            // APIs
+            window.ntShowLoader = show;
+            window.ntHideLoader = hide;
+
+            // Hide on load
+            window.addEventListener("load", function () {
+                if (loader && loader.style.display !== "none") hide();
+            });
+
+            // Utility: check data-nt-no-loader on element/parents
+            function hasNoLoaderAttr(el) {
+                if (!el) return false;
+                return !!(el.closest && el.closest("[data-nt-no-loader]"));
+            }
+
+            // Utility: validate form (HTML5 + jQuery validate if exists)
+            function isFormValid(form) {
+                // 1) HTML5
+                if (typeof form.checkValidity === "function") {
+                    if (!form.checkValidity()) {
+                        if (typeof form.reportValidity === "function") form.reportValidity();
+                        return false;
+                    }
+                }
+
+                // 2) jQuery validate (unobtrusive)
+                const $ = window.jQuery;
+                if ($ && typeof $(form).valid === "function") {
+                    const hasValidator = $(form).data("validator") || $(form).data("unobtrusiveValidation");
+                    if (hasValidator && !$(form).valid()) return false;
+                }
+
+                return true;
+            }
+
+            document.addEventListener("submit", function (e) {
+                const form = e.target;
+                if (!form) return;
+
+                if (hasNoLoaderAttr(form)) return;
+
+                const targetAttr = (form.getAttribute("target") || "").toLowerCase();
+                if (targetAttr === "_blank") return;
+
+                setTimeout(() => {
+                    if (e.defaultPrevented) { hide(); return; }
+                    if (!isFormValid(form)) { hide(); return; }
+
+                    show("Loading…");
+
+                    setTimeout(() => {
+                        if (e.defaultPrevented) hide();
+                    }, 0);
+                }, 0);
+            }, true);
+
+            document.addEventListener("invalid", function () {
+                hide();
+            }, true);
+
+            document.addEventListener("click", function (e) {
+                const a = e.target && e.target.closest ? e.target.closest("a") : null;
+                if (!a) return;
+
+                if (hasNoLoaderAttr(a)) return;
+
+                const href = a.getAttribute("href") || "";
+                if (!href || href.startsWith("#")) return;
+
+                const targetAttr = (a.getAttribute("target") || "").toLowerCase();
+                if (targetAttr === "_blank") return;
+                if (a.hasAttribute("download")) return;
+
+                try {
+                    const url = new URL(href, window.location.origin);
+                    if (url.origin !== window.location.origin) return;
+
+                    if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
+                } catch { return; }
+
+                show("Loading…");
+            }, true);
+
+            window.addEventListener("pageshow", function (e) {
+                if (e.persisted && loader) {
+                    loader.classList.remove("nt-on");
+                    loader.style.display = "none";
+                    loader.setAttribute("aria-hidden", "true");
+                    set(0);
+                }
+            });
+        })();
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

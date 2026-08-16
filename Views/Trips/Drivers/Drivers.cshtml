@@ -1,0 +1,91 @@
+﻿@model List<NoufirTours.Models.Trips.Drivers.DriverListItemModel>
+@{
+    ViewData["Title"] = "Drivers";
+    var q = (string?)ViewBag.Q ?? "";
+    var includeArchived = (bool)(ViewBag.IncludeArchived ?? false);
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Drivers</h2>
+    <a class="btn btn-primary" asp-action="CreateNewDriver">Add New Driver</a>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-6">
+        <input name="q" value="@q" class="form-control" placeholder="Search by name, national id, address..." />
+    </div>
+    <div class="col-md-3 d-flex align-items-center">
+        <div class="form-check me-3">
+            <input class="form-check-input"
+                   type="radio"
+                   name="includeArchived"
+                   value="false"
+                   @(!includeArchived ? "checked" : "")
+                   id="excludeArchived" />
+            <label class="form-check-label" for="excludeArchived">Exclude archived</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input"
+                   type="radio"
+                   name="includeArchived"
+                   value="true"
+                   @(includeArchived ? "checked" : "")
+                   id="includeArchived" />
+            <label class="form-check-label" for="includeArchived">Include archived</label>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <button class="btn btn-secondary w-100" type="submit">Search</button>
+    </div>
+</form>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">No drivers found.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>National ID</th>
+                    <th>Primary Phone</th>
+                    <th>Address</th>
+                    <th style="width:130px">Status</th>
+                    <th style="width:180px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Model)
+                {
+                    <tr>
+                        <td>@d.FullName</td>
+                        <td>@d.NationalId</td>
+                        <td>@d.PrimaryPhone</td>
+                        <td>@d.Address</td>
+                        <td>
+                            @if (d.IsArchived)
+                            {
+                                <span class="badge bg-secondary">Archived</span>
+                            }
+                            else if (d.IsActive)
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">Inactive</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" asp-action="DriverDetails" asp-route-id="@d.Id">Details</a>
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="EditDriver" asp-route-id="@d.Id">Edit</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

@@ -1,0 +1,753 @@
+﻿@model NoufirTours.Models.Trips.Drivers.DriverEditModel
+@{
+    ViewData["Title"] = "Edit Driver";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+    var lockCore = Model.LockCoreFields;
+    var isArchived = Model.IsArchived;
+}
+
+<style nonce="@nonce">
+    /* =========================
+           NoufirTours - Light/Dark polish (NO markup changes)
+           Uses Bootstrap theme switch via [data-bs-theme="dark"]
+           ========================= */
+
+    :root {
+        --nt-surface: #ffffff;
+        --nt-surface-2: #f8fafc;
+        --nt-border: rgba(0,0,0,.10);
+        --nt-border-2: rgba(0,0,0,.14);
+        --nt-muted: rgba(0,0,0,.55);
+        --nt-muted-2: rgba(0,0,0,.65);
+        --nt-title: rgba(0,0,0,.88);
+        --nt-shadow: 0 10px 22px rgba(0,0,0,.08);
+        --nt-input-bg: #ffffff;
+        --nt-input-border: rgba(0,0,0,.14);
+        --nt-input-border-focus: rgba(13,110,253,.45);
+        --nt-input-text: rgba(0,0,0,.88);
+        --nt-placeholder: rgba(0,0,0,.45);
+        --nt-soft: rgba(13,110,253,.08);
+        --nt-soft-2: rgba(25,135,84,.08);
+        --nt-help: rgba(0,0,0,.55);
+        --nt-list-bg: #ffffff;
+        --nt-list-hover: rgba(13,110,253,.06);
+        --nt-list-border: rgba(0,0,0,.10);
+        /* Disabled look (for locked/archived core fields) */
+        --nt-disabled-bg: rgba(0,0,0,.04);
+        --nt-disabled-text: rgba(0,0,0,.55);
+        --nt-disabled-border: rgba(0,0,0,.10);
+    }
+
+    [data-bs-theme="dark"] {
+        --nt-surface: #1f2328;
+        --nt-surface-2: #15191e;
+        --nt-border: rgba(255,255,255,.12);
+        --nt-border-2: rgba(255,255,255,.18);
+        --nt-muted: rgba(255,255,255,.62);
+        --nt-muted-2: rgba(255,255,255,.72);
+        --nt-title: rgba(255,255,255,.92);
+        --nt-shadow: 0 10px 22px rgba(0,0,0,.35);
+        --nt-input-bg: #101418;
+        --nt-input-border: rgba(255,255,255,.18);
+        --nt-input-border-focus: rgba(13,110,253,.55);
+        --nt-input-text: rgba(255,255,255,.92);
+        --nt-placeholder: rgba(255,255,255,.45);
+        --nt-soft: rgba(13,110,253,.14);
+        --nt-soft-2: rgba(25,135,84,.14);
+        --nt-help: rgba(255,255,255,.60);
+        --nt-list-bg: #101418;
+        --nt-list-hover: rgba(13,110,253,.14);
+        --nt-list-border: rgba(255,255,255,.12);
+        --nt-disabled-bg: rgba(255,255,255,.06);
+        --nt-disabled-text: rgba(255,255,255,.55);
+        --nt-disabled-border: rgba(255,255,255,.14);
+    }
+
+    /* Headings + helpers */
+    h2, h3, h4, h5, h6 {
+        color: var(--nt-title);
+    }
+
+    .text-muted {
+        color: var(--nt-muted) !important;
+    }
+
+    .small.text-muted {
+        color: var(--nt-help) !important;
+    }
+
+    hr {
+        border-color: var(--nt-border) !important;
+        opacity: 1;
+    }
+
+    /* Alerts: keep Bootstrap intent but fit dark */
+    [data-bs-theme="dark"] .alert-danger {
+        background-color: rgba(220,53,69,.18) !important;
+        color: rgba(255,255,255,.92) !important;
+        border-color: rgba(220,53,69,.20) !important;
+    }
+
+    [data-bs-theme="dark"] .alert-warning {
+        background-color: rgba(255,193,7,.16) !important;
+        color: rgba(255,255,255,.92) !important;
+        border-color: rgba(255,193,7,.20) !important;
+    }
+
+    /* Cards */
+    .card {
+        background: var(--nt-surface);
+        border: 1px solid var(--nt-border) !important;
+        box-shadow: var(--nt-shadow) !important;
+    }
+
+        .card.shadow-sm {
+            box-shadow: var(--nt-shadow) !important;
+        }
+
+        .card.border-0 {
+            border-color: transparent !important;
+        }
+
+        .card .card-body {
+            color: var(--nt-input-text);
+        }
+
+        /* Subtle gradient behind main card body */
+        .card > .card-body.p-4 {
+            background: linear-gradient(135deg, var(--nt-soft), var(--nt-soft-2));
+            border-radius: 16px;
+        }
+
+    [data-bs-theme="dark"] .card > .card-body.p-4 {
+        background: linear-gradient(135deg, rgba(13,110,253,.10), rgba(25,135,84,.10));
+    }
+    /* Inner cards should stay clean */
+    .card .card .card-body {
+        background: transparent !important;
+    }
+
+    /* .bg-light blocks */
+    .bg-light {
+        background-color: var(--nt-surface-2) !important;
+        border-color: var(--nt-border) !important;
+        color: var(--nt-input-text) !important;
+    }
+
+    /* Borders */
+    .border, .border-top, .border-bottom, .border-start, .border-end {
+        border-color: var(--nt-border) !important;
+    }
+
+    /* Inputs / selects / textarea */
+    .form-control, .form-select {
+        background-color: var(--nt-input-bg) !important;
+        color: var(--nt-input-text) !important;
+        border-color: var(--nt-input-border) !important;
+    }
+
+        .form-control::placeholder {
+            color: var(--nt-placeholder) !important;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--nt-input-border-focus) !important;
+            box-shadow: 0 0 0 .25rem rgba(13,110,253,.15) !important;
+        }
+
+    [data-bs-theme="dark"] .form-control:focus,
+    [data-bs-theme="dark"] .form-select:focus {
+        box-shadow: 0 0 0 .25rem rgba(13,110,253,.22) !important;
+    }
+
+    /* Floating labels */
+    .form-floating > label {
+        color: var(--nt-muted) !important;
+    }
+
+    .form-floating > .form-control:focus ~ label,
+    .form-floating > .form-control:not(:placeholder-shown) ~ label,
+    .form-floating > .form-select ~ label {
+        color: var(--nt-muted-2) !important;
+    }
+
+    /* Input group addons */
+    .input-group-text {
+        background-color: var(--nt-surface-2) !important;
+        color: var(--nt-input-text) !important;
+        border-color: var(--nt-input-border) !important;
+    }
+
+    /* Switch label */
+    .form-check-label {
+        color: var(--nt-input-text) !important;
+    }
+
+    /* Disabled/readonly fields look consistent in both themes */
+    .form-control[readonly] {
+        background-color: var(--nt-disabled-bg) !important;
+        color: var(--nt-disabled-text) !important;
+        border-color: var(--nt-disabled-border) !important;
+        opacity: 1;
+        cursor: not-allowed;
+    }
+
+    .form-control:disabled,
+    .form-select:disabled,
+    textarea.form-control:disabled {
+        background-color: var(--nt-disabled-bg) !important;
+        color: var(--nt-disabled-text) !important;
+        border-color: var(--nt-disabled-border) !important;
+        opacity: 1;
+        cursor: not-allowed;
+    }
+
+    .form-check-input:disabled {
+        opacity: .65;
+        cursor: not-allowed;
+    }
+
+    /* Phones list wrapper + options */
+    #phonesList {
+        background: transparent !important;
+        color: var(--nt-input-text) !important;
+    }
+
+        #phonesList option {
+            background: var(--nt-surface) !important;
+            color: var(--nt-input-text) !important;
+        }
+
+            #phonesList option:disabled {
+                color: var(--nt-muted) !important;
+            }
+
+    /* Validation */
+    .text-danger {
+        color: #dc3545 !important;
+    }
+
+    [data-bs-theme="dark"] .text-danger {
+        color: #ff6b6b !important;
+    }
+
+    /* Icon inherit */
+    .bi {
+        color: inherit;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0 fw-bold">Edit Driver</h2>
+        <div class="text-muted small">Update driver profile and phone numbers</div>
+    </div>
+
+    <a asp-action="DriverDetails" asp-route-id="@Model.Id" class="btn btn-outline-secondary" data-nt-no-loader>
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+@if (isArchived)
+{
+    <div class="alert alert-danger border-0 shadow-sm">
+        <i class="bi bi-trash3-fill"></i>
+        This driver is <b>Deleted (Archived)</b>. Editing is not allowed.
+        Please restore the driver first.
+    </div>
+}
+else if (lockCore)
+{
+    <div class="alert alert-warning border-0 shadow-sm">
+        <i class="bi bi-shield-lock"></i>
+        This driver is already assigned to trips, so core fields are locked.
+        You can only edit <b>Address</b>, <b>Phones</b>, and <b>Notes</b>.
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+        <form asp-action="EditDriver" asp-route-id="@Model.Id" method="post" id="driverForm">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="LockCoreFields" />
+            <input type="hidden" asp-for="IsArchived" />
+
+            <div class="row g-4">
+
+                <!-- Personal -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">Personal Information</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="FullName"
+                               class="form-control"
+                               placeholder="Full Name"
+                               readonly="@(isArchived || lockCore ? "readonly" : null)" />
+                        <label asp-for="FullName">Full Name</label>
+                    </div>
+                    <span asp-validation-for="FullName" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="NationalId"
+                               class="form-control"
+                               placeholder="National ID"
+                               inputmode="numeric"
+                               pattern="\d{14}"
+                               maxlength="14"
+                               oninput="this.value=this.value.replace(/\D/g,'').slice(0,14)"
+                               readonly="@(isArchived || lockCore ? "readonly" : null)" />
+                        <label asp-for="NationalId">National ID</label>
+                    </div>
+                    <span asp-validation-for="NationalId" class="text-danger small"></span>
+                    <div class="text-danger small mt-1" id="nidError" style="display:none;"></div>
+                </div>
+
+                <!-- Address (Allowed unless archived) -->
+                <div class="col-12">
+                    <div class="form-floating">
+                        <input asp-for="Address"
+                               class="form-control"
+                               placeholder="Address"
+                               readonly="@(isArchived ? "readonly" : null)" />
+                        <label asp-for="Address">Address</label>
+                    </div>
+                    <span asp-validation-for="Address" class="text-danger small"></span>
+                </div>
+
+                <!-- License -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">License Information</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="LicenseNumber"
+                               class="form-control"
+                               placeholder="License Number"
+                               readonly="@(isArchived || lockCore ? "readonly" : null)" />
+                        <label asp-for="LicenseNumber">License Number</label>
+                    </div>
+                    <span asp-validation-for="LicenseNumber" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="LicenseExpiryDate"
+                               class="form-control"
+                               type="date"
+                               disabled="@(isArchived || lockCore ? "disabled" : null)" />
+                        <label asp-for="LicenseExpiryDate">License Expiry Date</label>
+                    </div>
+                    <span asp-validation-for="LicenseExpiryDate" class="text-danger small"></span>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input type="hidden" asp-for="LicenseExpiryDate" />
+                    }
+                </div>
+
+                <!-- Employment -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">Employment Information</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="JoinedAtDate"
+                               class="form-control"
+                               type="date"
+                               disabled="@(isArchived || lockCore ? "disabled" : null)" />
+                        <label asp-for="JoinedAtDate">Joined Date</label>
+                    </div>
+                    <span asp-validation-for="JoinedAtDate" class="text-danger small"></span>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input type="hidden" asp-for="JoinedAtDate" />
+                    }
+                </div>
+
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 bg-light border h-100 d-flex align-items-center">
+                        <div class="form-check form-switch m-0">
+                            <input asp-for="IsActive"
+                                   class="form-check-input"
+                                   type="checkbox"
+                                   role="switch"
+                                   disabled="@(isArchived ? "disabled" : null)" />
+                            <label class="form-check-label fw-bold" asp-for="IsActive">Active Driver</label>
+                        </div>
+                    </div>
+
+                    @if (isArchived)
+                    {
+                        <input type="hidden" asp-for="IsActive" />
+                    }
+                </div>
+
+                <!-- Notes -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">Additional Information</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-12">
+                    <div class="form-floating">
+                        <textarea asp-for="Notes"
+                                  class="form-control"
+                                  placeholder="Notes"
+                                  style="height: 110px"
+                                  readonly="@(isArchived ? "readonly" : null)"></textarea>
+                        <label asp-for="Notes">Notes</label>
+                    </div>
+                    <span asp-validation-for="Notes" class="text-danger small"></span>
+                </div>
+
+                <!-- Phones -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">Phone Numbers</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body p-3 p-md-4">
+                            <div class="row g-3">
+
+                                <div class="col-lg-6">
+                                    <label class="form-label fw-bold">Phone Editor</label>
+
+                                    <div class="input-group">
+                                        <input id="phoneInput"
+                                               class="form-control"
+                                               placeholder="Phone number"
+                                               autocomplete="off"
+                                               inputmode="numeric"
+                                               maxlength="11"
+                                               @(isArchived ? "disabled" : null) />
+                                        <div class="input-group-text">
+                                            <div class="form-check">
+                                                <input id="primaryCheck" class="form-check-input" type="checkbox" @(isArchived ? "disabled" : null) />
+                                                <label class="form-check-label small">Primary</label>
+                                            </div>
+                                        </div>
+
+                                        <button id="btnAddPhone" type="button" class="btn btn-primary" data-nt-no-loader @(isArchived ? "disabled" : null)>
+                                            <i class="bi bi-plus-lg"></i> Add
+                                        </button>
+                                    </div>
+
+                                    <div class="text-danger small mt-1" id="phoneError" style="display:none;"></div>
+
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button id="btnUpdatePhone" type="button" class="btn btn-outline-success w-100" data-nt-no-loader @(isArchived ? "disabled" : null)>
+                                            <i class="bi bi-pencil-square"></i> Update
+                                        </button>
+                                        <button id="btnDeletePhone" type="button" class="btn btn-outline-danger w-100" data-nt-no-loader @(isArchived ? "disabled" : null)>
+                                            <i class="bi bi-trash"></i> Delete
+                                        </button>
+                                        <button id="btnClearPhone" type="button" class="btn btn-outline-secondary w-100" data-nt-no-loader @(isArchived ? "disabled" : null)>
+                                            <i class="bi bi-eraser"></i> Clear
+                                        </button>
+                                    </div>
+
+                                    <div class="text-muted small mt-2">
+                                        Press <b>Enter</b> to add.
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-6">
+                                    <label class="form-label fw-bold">Phones List</label>
+                                    <div class="border rounded-3 p-2 bg-light">
+                                        <select id="phonesList" class="form-select border-0 bg-transparent" size="8" @(isArchived ? "disabled" : null)></select>
+                                    </div>
+                                    <div class="text-muted small mt-1">
+                                        Select a number to load it for editing.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="phonesHidden"></div>
+
+                            <div class="text-danger mt-2">
+                                @Html.ValidationSummary(excludePropertyErrors: true)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="col-12">
+                    <div class="d-flex gap-2 justify-content-end">
+                        @if (!isArchived)
+                        {
+                            <button type="submit" class="btn btn-primary px-5" id="btnSaveDriver">
+                                <i class="bi bi-check-circle"></i> Save Changes
+                            </button>
+                        }
+                        <a asp-action="DriverDetails" asp-route-id="@Model.Id" class="btn btn-outline-secondary px-4" data-nt-no-loader>
+                            Close
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script nonce="@nonce">
+            const IS_ARCHIVED = @((Model.IsArchived ? "true" : "false"));
+            const LOCK_CORE = @((Model.LockCoreFields ? "true" : "false"));
+
+            window.phones = [];
+            const serverPhones = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                                            (Model.Phones ?? new List<NoufirTours.Models.Trips.Drivers.DriverPhoneInputModel>())
+                                                            .Select(p => new { id = p.Id, phoneNumber = p.PhoneNumber, isPrimary = p.IsPrimary })
+                            ));
+    window.phones = serverPhones || [];
+
+            function isValidEgyptianPhone(phone) { return /^01[0125][0-9]{8}$/.test(phone); }
+            function normalizePhone(s) { return (s || '').trim().replace(/\s+/g, '').replace(/[^\d]/g, ''); }
+
+            function showError(msg) {
+                const el = document.getElementById('phoneError');
+                if (!el) return;
+                if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+                el.style.display = 'block';
+                el.textContent = msg;
+            }
+
+            function showNidError(msg) {
+                const el = document.getElementById('nidError');
+                if (!el) return;
+                if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+                el.style.display = 'block';
+                el.textContent = msg;
+            }
+
+            function escapeHtml(str) {
+                if (str == null) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function refreshUI() {
+                const list = document.getElementById('phonesList');
+                const hidden = document.getElementById('phonesHidden');
+                if (!list || !hidden) return;
+
+                list.innerHTML = '';
+
+                if (window.phones.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No phones added yet';
+                    opt.disabled = true;
+                    opt.selected = true;
+                    list.appendChild(opt);
+                } else {
+                    window.phones.forEach((p, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = String(idx);
+                        opt.textContent = (p.isPrimary ? '★ ' : '') + p.phoneNumber;
+                        list.appendChild(opt);
+                    });
+                }
+
+                hidden.innerHTML = '';
+                window.phones.forEach((p, idx) => {
+                    const idVal = (p.id == null ? '' : p.id);
+                    hidden.insertAdjacentHTML('beforeend', `
+                        <input type="hidden" name="Phones[${idx}].Id" value="${escapeHtml(idVal)}" />
+                        <input type="hidden" name="Phones[${idx}].PhoneNumber" value="${escapeHtml(p.phoneNumber)}" />
+                        <input type="hidden" name="Phones[${idx}].IsPrimary" value="${p.isPrimary}" />
+                    `);
+                });
+            }
+
+            function getSelectedIndex() {
+                const list = document.getElementById('phonesList');
+                if (!list) return null;
+                if (list.selectedIndex < 0) return null;
+                const opt = list.options[list.selectedIndex];
+                if (!opt || opt.disabled) return null;
+                const idx = parseInt(opt.value, 10);
+                return Number.isNaN(idx) ? null : idx;
+            }
+
+            function clearEditor(clearSelection = true) {
+                showError('');
+                const input = document.getElementById('phoneInput');
+                const primaryCheck = document.getElementById('primaryCheck');
+                const list = document.getElementById('phonesList');
+
+                if (input) input.value = '';
+                if (primaryCheck) primaryCheck.checked = false;
+
+                if (clearSelection && list) list.selectedIndex = -1;
+            }
+
+            function addPhone() {
+                if (IS_ARCHIVED) return;
+                showError('');
+
+                const input = document.getElementById('phoneInput');
+                const primaryCheck = document.getElementById('primaryCheck');
+                if (!input || !primaryCheck) return;
+
+                const phone = normalizePhone(input.value);
+                if (!phone) { showError('Please enter a phone number.'); input.focus(); return; }
+                if (!isValidEgyptianPhone(phone)) { showError('Invalid phone number format.'); input.focus(); return; }
+
+                const exists = window.phones.some(p => (p.phoneNumber || '').toLowerCase() === phone.toLowerCase());
+                if (exists) { showError('This phone already exists.'); input.focus(); return; }
+
+                const isPrimary = primaryCheck.checked;
+                if (isPrimary) window.phones.forEach(p => p.isPrimary = false);
+
+                window.phones.push({ id: null, phoneNumber: phone, isPrimary });
+                if (window.phones.length > 0 && !window.phones.some(p => p.isPrimary)) window.phones[0].isPrimary = true;
+
+                refreshUI();
+                input.value = '';
+                primaryCheck.checked = false;
+                input.focus();
+            }
+
+            function loadSelectedToEditor() {
+                if (IS_ARCHIVED) return;
+                showError('');
+                const idx = getSelectedIndex();
+                if (idx === null || idx < 0 || idx >= window.phones.length) return;
+
+                document.getElementById('phoneInput').value = window.phones[idx].phoneNumber;
+                document.getElementById('primaryCheck').checked = window.phones[idx].isPrimary;
+            }
+
+            function updateSelected() {
+                if (IS_ARCHIVED) return;
+                showError('');
+                const idx = getSelectedIndex();
+                if (idx === null) { showError('Select a phone first.'); return; }
+
+                const input = document.getElementById('phoneInput');
+                const primaryCheck = document.getElementById('primaryCheck');
+
+                const phone = normalizePhone(input.value);
+                const isPrimary = primaryCheck.checked;
+
+                if (!phone) { showError('Phone cannot be empty.'); return; }
+                if (!isValidEgyptianPhone(phone)) { showError('Invalid phone number format.'); return; }
+
+                const exists = window.phones.some((p, i) => i !== idx && (p.phoneNumber || '').toLowerCase() === phone.toLowerCase());
+                if (exists) { showError('This phone already exists.'); return; }
+
+                window.phones[idx].phoneNumber = phone;
+
+                if (isPrimary) {
+                    window.phones.forEach(p => p.isPrimary = false);
+                    window.phones[idx].isPrimary = true;
+                } else {
+                    window.phones[idx].isPrimary = false;
+                }
+
+                if (window.phones.length > 0 && !window.phones.some(p => p.isPrimary)) window.phones[0].isPrimary = true;
+
+                refreshUI();
+                const list = document.getElementById('phonesList');
+                if (list) list.selectedIndex = idx;
+                clearEditor(false);
+            }
+
+            function deleteSelected() {
+                if (IS_ARCHIVED) return;
+                showError('');
+                const idx = getSelectedIndex();
+                if (idx === null) { showError('Select a phone first.'); return; }
+
+                const wasPrimary = window.phones[idx].isPrimary;
+                window.phones.splice(idx, 1);
+
+                if (wasPrimary && window.phones.length > 0) window.phones[0].isPrimary = true;
+                if (window.phones.length > 0 && !window.phones.some(p => p.isPrimary)) window.phones[0].isPrimary = true;
+
+                refreshUI();
+                clearEditor();
+            }
+
+            function validateNationalIdFront() {
+                showNidError('');
+                const nidInput = document.getElementById('NationalId');
+                if (!nidInput) return true;
+
+                // ✅ If locked or archived => skip
+                if (LOCK_CORE || IS_ARCHIVED) return true;
+
+                const val = (nidInput.value || '').replace(/\D/g, '');
+                nidInput.value = val.slice(0, 14);
+
+                if (!/^\d{14}$/.test(nidInput.value)) {
+                    showNidError('National ID must be exactly 14 digits.');
+                    return false;
+                }
+                return true;
+            }
+
+            function beforeSubmit() {
+                if (IS_ARCHIVED) return false;
+                showError('');
+                showNidError('');
+
+                if (!validateNationalIdFront()) return false;
+
+                if (!window.phones || window.phones.length === 0) {
+                    showError('At least one phone is required.');
+                    return false;
+                }
+
+                const primCount = window.phones.filter(p => p.isPrimary).length;
+                if (primCount !== 1) {
+                    window.phones.forEach((p, i) => p.isPrimary = (i === 0));
+                    refreshUI();
+                }
+
+                return true;
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                refreshUI();
+
+                document.getElementById('btnAddPhone')?.addEventListener('click', addPhone);
+                document.getElementById('btnUpdatePhone')?.addEventListener('click', updateSelected);
+                document.getElementById('btnDeletePhone')?.addEventListener('click', deleteSelected);
+                document.getElementById('btnClearPhone')?.addEventListener('click', () => clearEditor(true));
+
+                document.getElementById('phonesList')?.addEventListener('change', loadSelectedToEditor);
+
+                document.getElementById('phoneInput')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); addPhone(); }
+                });
+
+                document.getElementById('driverForm')?.addEventListener('submit', (e) => {
+                    if (!beforeSubmit()) e.preventDefault();
+                });
+            });
+    </script>
+}

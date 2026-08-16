@@ -1,0 +1,155 @@
+﻿@model NoufirTours.Models.Trips.Accounts.UserCreateModel
+@{
+    ViewData["Title"] = "Create Account";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="mb-0">Add New Account</h3>
+            <div class="text-muted small">Create user and set role/permission</div>
+        </div>
+        <a asp-action="Accounts" asp-controller="Trips" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" asp-action="UserCreate" asp-controller="Trips">
+                @Html.AntiForgeryToken()
+
+                <div class="row g-3">
+
+                    <!-- Username -->
+                    <div class="col-md-4">
+                        <label class="form-label">Username</label>
+                        <input asp-for="Username" class="form-control" />
+                        <span asp-validation-for="Username" class="text-danger"></span>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="col-md-4">
+                        <label class="form-label">Password</label>
+
+                        <div class="input-group">
+                            <input asp-for="Password"
+                                   class="form-control"
+                                   type="password"
+                                   id="passwordInput" />
+
+                            <button type="button"
+                                    id="togglePassword"
+                                    class="btn btn-light border">
+                                <i class="bi bi-eye-fill fs-5" id="toggleIcon"></i>
+                            </button>
+                        </div>
+
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                    </div>
+                    <!-- Role -->
+                    <div class="col-md-4">
+                        <label class="form-label">Role</label>
+                        <select asp-for="RoleText" class="form-select">
+                            <option value="admin">admin</option>
+                            <option value="staff">Company</option>
+                        </select>
+                        <span asp-validation-for="RoleText" class="text-danger"></span>
+                    </div>
+
+                    <!-- Full Name -->
+                    <div class="col-md-6">
+                        <label class="form-label">Full Name</label>
+                        <input asp-for="FullName" class="form-control" />
+                        <span asp-validation-for="FullName" class="text-danger"></span>
+                    </div>
+
+                    <!-- Phone -->
+                    <div class="col-md-4">
+                        <label class="form-label">Phone</label>
+                        <input asp-for="Phone" class="form-control" />
+                        <span asp-validation-for="Phone" class="text-danger"></span>
+                    </div>
+
+                    <!-- Active -->
+                    <div class="col-md-2 d-flex align-items-end">
+                        <div class="form-check">
+                            <input asp-for="IsActive" class="form-check-input" />
+                            <label class="form-check-label" asp-for="IsActive">Active</label>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="col-12">
+                        <button class="btn btn-primary">
+                            <i class="bi bi-check2-circle me-1"></i> Create
+                        </button>
+                    </div>
+
+                </div>
+            </form>
+
+            <div class="text-danger mt-2">
+                @Html.ValidationSummary(excludePropertyErrors: true)
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <!-- Password Toggle Styling -->
+    <style nonce="@nonce">
+        .password-toggle-btn {
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            border: none;
+            background: rgba(0,0,0,0.05);
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #495057;
+            transition: all 0.2s ease;
+        }
+
+            .password-toggle-btn i {
+                font-size: 1.2rem;
+            }
+
+            .password-toggle-btn:hover {
+                background: #0d6efd;
+                color: #fff;
+                transform: translateY(-50%) scale(1.05);
+            }
+
+            .password-toggle-btn:active {
+                transform: translateY(-50%) scale(0.95);
+            }
+    </style>
+
+    <!-- Password Toggle Script -->
+    <script nonce="@nonce">
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const passwordInput = document.getElementById("passwordInput");
+            const toggleBtn = document.getElementById("togglePassword");
+            const icon = document.getElementById("toggleIcon");
+
+            toggleBtn.addEventListener("click", function () {
+
+                const isHidden = passwordInput.type === "password";
+                passwordInput.type = isHidden ? "text" : "password";
+
+                icon.classList.toggle("bi-eye-fill");
+                icon.classList.toggle("bi-eye-slash-fill");
+
+            });
+        });
+    </script>
+}

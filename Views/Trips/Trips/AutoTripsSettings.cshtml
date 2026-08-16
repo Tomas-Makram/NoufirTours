@@ -1,0 +1,1243 @@
+﻿@* File: Views/Trips/Trips/AutoTripsSettings.cshtml *@
+@model NoufirTours.Models.Trips.Trips.AutoTripsPlannerModel
+@using System.Globalization
+@using NoufirTours.Data
+
+@{
+    ViewData["Title"] = "Auto Trips Settings";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    var defaultLat = 27.180824m;
+    var defaultLng = 31.189725m;
+}
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="mb-0">Auto Trips Settings</h3>
+            <div class="text-muted small">Dynamic planner: slots by availability + prevents duplicate bus/driver across templates.</div>
+        </div>
+        <a asp-action="Trips" asp-controller="Trips" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back to Trips
+        </a>
+    </div>
+
+    <div id="plannerInner">
+        @await Html.PartialAsync("~/Views/Trips/Trips/Partials/_AutoTripsSettingsInner.cshtml", Model)
+    </div>
+</div>
+
+<!-- ========================= MODALS (static) ========================= -->
+<div class="modal fade" id="tripEditorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Edit / Create Trip Template</h5>
+                    <small class="opacity-75">Save => planner refresh</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body" id="tripEditorBody">
+                <form id="autoTripEditorForm" method="post" asp-action="SaveAutoTripTemplateModal" asp-controller="Trips">
+                    @Html.AntiForgeryToken()
+
+                    <input type="hidden" name="PlanId" id="edPlanId" value="" />
+                    <input type="hidden" name="ItemId" id="edId" value="" />
+                    <input type="hidden" name="OrderNo" id="edOrderNo" value="0" />
+                    <input type="hidden" name="CheckDate" id="edCheckDate" value="" />
+
+                    <div class="bg-info bg-opacity-25 border rounded p-3 mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <div class="fw-bold" id="edTitle">Template</div>
+                            <div class="small text-muted" id="edDateText">Date check: Not selected</div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-4">
+                            <input type="hidden" name="IsEnabled" value="false" />
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="edIsEnabled" name="IsEnabled" value="true" />
+                                <label class="form-check-label" for="edIsEnabled">Enabled</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="edWarningBox" class="alert alert-warning small" style="display:none;"></div>
+
+                    <!-- Main fields -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Trip Name</label>
+                            <input class="form-control" id="edTripName" name="TripName" value="" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Depart Time</label>
+                            <input class="form-control" type="time" id="edDepartTime" name="DepartTime" value="" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Route</label>
+                            <div class="d-flex gap-2">
+                                <input class="form-control" id="edFromCity" name="FromCity" value="" placeholder="From" />
+                                <input class="form-control" id="edToCity" name="ToCity" value="" placeholder="To" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ✅ Trip Type -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Trip Type</label>
+                        <div class="d-flex gap-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="PriceType" value="1" id="priceTypeGo">
+                                <label class="form-check-label" for="priceTypeGo">
+                                    <i class="bi bi-arrow-right"></i> Go Only
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="PriceType" value="2" id="priceTypeReturn">
+                                <label class="form-check-label" for="priceTypeReturn">
+                                    <i class="bi bi-arrow-left"></i> Return Only
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="PriceType" value="3" id="priceTypeRound" checked>
+                                <label class="form-check-label" for="priceTypeRound">
+                                    <i class="bi bi-arrow-left-right"></i> Round Trip
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ✅ Prices - Dynamic based on selection -->
+                    <div class="row mb-3 g-3" id="priceFields">
+                        <!-- Go Price Field (يظهر في Go و Round) -->
+                        <div class="col-md-4 price-field" id="fieldGoPrice">
+                            <label class="form-label fw-bold">Seat Price Go</label>
+                            <input class="form-control" id="edSeatPriceGo" name="SeatPriceGo" type="number" step="0.01" min="0" value="" />
+                        </div>
+
+                        <!-- Return Price Field (يظهر في Return و Round) -->
+                        <div class="col-md-4 price-field" id="fieldReturnPrice">
+                            <label class="form-label fw-bold">Seat Price Return</label>
+                            <input class="form-control" id="edSeatPriceReturn" name="SeatPriceReturn" type="number" step="0.01" min="0" value="" />
+                        </div>
+
+                        <!-- Round Price Field (يظهر فقط في Round) -->
+                        <div class="col-md-4 price-field" id="fieldRoundPrice">
+                            <input type = "hidden" class="form-control" id="edSeatPriceRound" name="SeatPriceRound" type="number" step="0.01" min="0" value="" />
+                        </div>
+                    </div>
+
+                    <!-- Bus/Driver -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Bus (available only)</label>
+                            <div class="input-group">
+                                <select id="modalBusSelect" class="form-select" name="BusId">
+                                    <option value="">-- Select Bus --</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" id="modalBusDetailsBtn">Details</button>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Driver (available only)</label>
+                            <div class="input-group">
+                                <select id="modalDriverSelect" class="form-select" name="DriverId">
+                                    <option value="">-- Select Driver --</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-success" id="modalDriverDetailsBtn">Details</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pickup Location -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Pickup Location</label>
+
+                        <div class="border rounded p-3">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label fw-bold mb-1">Pickup Place</label>
+                                    <input id="modalPickupPlace"
+                                           class="form-control"
+                                           name="PickupPlace"
+                                           value=""
+                                           placeholder="Pickup place text" />
+                                </div>
+
+                                <div class="col-md-4 text-md-end">
+                                    <button type="button"
+                                            class="btn btn-primary w-100"
+                                            id="btnOpenTemplateLocation"
+                                            data-default-lat="@defaultLat.ToString(CultureInfo.InvariantCulture)"
+                                            data-default-lng="@defaultLng.ToString(CultureInfo.InvariantCulture)">
+                                        <i class="bi bi-geo-alt me-1"></i> Use GPS / Choose Location
+                                    </button>
+
+                                    <div class="small text-muted mt-2" id="modalPickupMiniInfo"></div>
+                                </div>
+                            </div>
+
+                            <input type="hidden" id="modalPickupLat" name="PickupLat" value="" />
+                            <input type="hidden" id="modalPickupLon" name="PickupLon" value="" />
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Dropoff Place</label>
+                            <input class="form-control" id="edDropoffPlace" name="DropoffPlace" value="" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Notes</label>
+                            <input class="form-control" id="edNotes" name="Notes" value="" />
+                        </div>
+                    </div>
+
+                    <div class="text-danger small" id="edServerError" style="display:none;"></div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-success" type="button" id="btnSaveTripEditor">
+                    <i class="bi bi-check2-circle me-1"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="busModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Bus Details</h5>
+                    <small class="opacity-75">Selected bus info</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="busModalBody">Loading...</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="driverModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Driver Details</h5>
+                    <small class="opacity-75">Selected driver info</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="driverModalBody">Loading...</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= TEMPLATE LOCATION MODAL ========================= -->
+<div class="modal fade" id="templateLocationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <div>
+                    <h5 class="modal-title mb-0"><i class="bi bi-geo-alt"></i> Choose Pickup Location</h5>
+                    <small class="opacity-75">Search, GPS, or click the map (auto updates instantly)</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="d-flex gap-2 flex-wrap mb-2">
+                                <button type="button" class="btn btn-primary" id="tplBtnGps">
+                                    <i class="bi bi-crosshair2"></i> Use GPS
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="tplBtnClear">
+                                    <i class="bi bi-x-circle"></i> Clear
+                                </button>
+                            </div>
+
+                            <div class="small text-muted mb-3" id="tplModalStatus">
+                                Search place or click on map.
+                            </div>
+
+                            <label class="form-label fw-bold mb-1">Search Place</label>
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" id="tplTxtSearch"
+                                       placeholder="Cairo, أسيوط, شارع..." autocomplete="off" />
+                                <button type="button" class="btn btn-outline-primary" id="tplBtnSearch">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+
+                            <div class="form-text small mb-2" id="tplSearchStatus">
+                                Type and press Search.
+                            </div>
+
+                            <div id="tplResultsWrap" style="display:none;">
+                                <div class="small fw-semibold mb-1">Results</div>
+                                <div class="list-group" id="tplResults"></div>
+                            </div>
+
+                            <div class="alert alert-warning mt-2 py-2" id="tplSearchError" style="display:none;">
+                                <div class="small" id="tplSearchErrorText"></div>
+                            </div>
+
+                            <hr />
+
+                            <input type="hidden" id="tplTmpLat" />
+                            <input type="hidden" id="tplTmpLng" />
+                            <div class="small text-muted" id="tplTmpCoordsText"></div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-8">
+                        <div id="tplMap" class="map-box"></div>
+                        <div class="mt-2 p-2 rounded selected-box">
+                            <div class="small fw-semibold mb-1">Selected</div>
+                            <div class="small text-muted" id="tplSelectedDetails">No selection yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="tplBtnDone">
+                    <i class="bi bi-check2-circle me-1"></i> Done
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script nonce="@nonce" src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <script nonce="@nonce">
+        (function () {
+            const reservations = {};
+            const tripEditorModal = new bootstrap.Modal(document.getElementById('tripEditorModal'));
+            const busModal = new bootstrap.Modal(document.getElementById('busModal'));
+            const driverModal = new bootstrap.Modal(document.getElementById('driverModal'));
+            const templateLocationModal = new bootstrap.Modal(document.getElementById('templateLocationModal'));
+
+            function $(id) { return document.getElementById(id); }
+            function plannerInner() { return $('plannerInner'); }
+
+            function showEditorWarning(msg) {
+                const box = $('edWarningBox');
+                if (!box) return;
+                if (!msg) { box.style.display = 'none'; box.textContent = ''; return; }
+                box.textContent = msg;
+                box.style.display = 'block';
+            }
+
+            function setServerError(msg) {
+                const box = $('edServerError');
+                if (!box) return;
+                if (!msg) { box.style.display = 'none'; box.textContent = ''; return; }
+                box.textContent = msg;
+                box.style.display = 'block';
+            }
+
+            function getPlanId() {
+                const el = document.querySelector('#plannerInner input[name="PlanId"]');
+                return el ? el.value : "";
+            }
+
+            function antiForgeryToken() {
+                const token = document.querySelector('#plannerInner form#planForm input[name="__RequestVerificationToken"]');
+                return token ? token.value : "";
+            }
+
+            function getPlannerMode() {
+                const r = document.querySelector('#plannerInner input[name="plannerMode"]:checked');
+                return r ? (r.value || "db") : "db";
+            }
+
+            function currentDateFromUI() {
+                const el = document.querySelector('#plannerInner #checkDateInput');
+                return (el?.value || "").trim();
+            }
+
+            function isPlanEnabledFromUI() {
+                const el = document.querySelector('#plannerInner #autoPlanEnabled');
+                return el ? el.checked : true;
+            }
+
+            function setPlanBodyEnabledUI() {
+                const enabled = isPlanEnabledFromUI();
+                const body = document.querySelector('#plannerInner #autoPlanBody');
+                if (!body) return;
+                body.style.display = enabled ? "" : "none";
+            }
+
+            async function fetchHtml(url, options) {
+                try {
+                    const res = await fetch(url, Object.assign({
+                        headers: { "X-Requested-With": "XMLHttpRequest" }
+                    }, options || {}));
+                    const html = await res.text();
+                    const warning = res.headers.get('X-AutoTrip-Warning') || '';
+                    return { ok: res.ok, status: res.status, html, warning };
+                } catch {
+                    return { ok: false, status: 0, html: null, warning: '' };
+                }
+            }
+
+            async function fetchJson(url) {
+                try {
+                    const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+                    if (!res.ok) return { ok: false, status: res.status, json: null };
+                    const json = await res.json();
+                    return { ok: true, status: res.status, json };
+                } catch {
+                    return { ok: false, status: 0, json: null };
+                }
+            }
+
+            async function loadPlanner() {
+                if (!isPlanEnabledFromUI()) { setPlanBodyEnabledUI(); return; }
+
+                const mode = getPlannerMode();
+                const date = (mode === "date") ? currentDateFromUI() : "";
+
+                const url = (mode === "date" && date)
+                    ? `/Trips/AutoTripsSettingsPartial?checkDate=${encodeURIComponent(date)}`
+                    : `/Trips/AutoTripsSettingsPartial`;
+
+                const r = await fetchHtml(url);
+                if (!plannerInner()) return;
+
+                if (r.ok && r.html) {
+                    plannerInner().innerHTML = r.html;
+                    syncReservationsFromPlanner();
+                    setPlanBodyEnabledUI();
+                }
+            }
+
+            function syncReservationsFromPlanner() {
+                for (const k of Object.keys(reservations)) delete reservations[k];
+                document.querySelectorAll('#plannerInner [data-template-row]').forEach(row => {
+                    const order = row.getAttribute('data-order');
+                    const busId = row.getAttribute('data-bus-id') || "";
+                    const driverId = row.getAttribute('data-driver-id') || "";
+                    if (!order) return;
+                    reservations[order] = { busId, driverId };
+                });
+            }
+
+            function applyReservationToModal(orderNo) {
+                const busSel = document.querySelector('#tripEditorBody #modalBusSelect');
+                const drvSel = document.querySelector('#tripEditorBody #modalDriverSelect');
+                if (!busSel || !drvSel) return;
+
+                const my = reservations[String(orderNo)] || { busId: "", driverId: "" };
+                const usedBus = new Set();
+                const usedDrv = new Set();
+
+                for (const [ord, v] of Object.entries(reservations)) {
+                    if (String(ord) === String(orderNo)) continue;
+                    if (v?.busId) usedBus.add(String(v.busId));
+                    if (v?.driverId) usedDrv.add(String(v.driverId));
+                }
+
+                [...busSel.options].forEach(opt => {
+                    const val = (opt.value || "").toString();
+                    if (!val) { opt.hidden = false; opt.disabled = false; return; }
+                    const blocked = usedBus.has(val) && val !== String(my.busId);
+                    opt.disabled = blocked;
+                    opt.hidden = blocked;
+                });
+
+                [...drvSel.options].forEach(opt => {
+                    const val = (opt.value || "").toString();
+                    if (!val) { opt.hidden = false; opt.disabled = false; return; }
+                    const blocked = usedDrv.has(val) && val !== String(my.driverId);
+                    opt.disabled = blocked;
+                    opt.hidden = blocked;
+                });
+            }
+
+            function enforceEnableRulesUI(reason) {
+                const enabled = $('edIsEnabled');
+                const busSel = $('modalBusSelect');
+                const drvSel = $('modalDriverSelect');
+                const latEl = $('modalPickupLat');
+                const lonEl = $('modalPickupLon');
+
+                if (!enabled || !busSel || !drvSel) return;
+
+                if (enabled.checked) {
+                    const busNone = !busSel.value || busSel.value === "";
+                    const drvNone = !drvSel.value || drvSel.value === "";
+                    const lat = (latEl?.value || "").trim();
+                    const lon = (lonEl?.value || "").trim();
+                    const coordsMissing = (!lat || !lon);
+
+                    if (busNone || drvNone || coordsMissing) {
+                        enabled.checked = false;
+                        const parts = [];
+                        if (busNone) parts.push("Bus");
+                        if (drvNone) parts.push("Driver");
+                        if (coordsMissing) parts.push("Pickup Location");
+                        showEditorWarning(reason || `To keep this template Enabled, you must select: ${parts.join(", ")}. Auto-disabled.`);
+                    } else {
+                        showEditorWarning('');
+                    }
+                }
+            }
+
+            function attachModalChangeHandlers(orderNo) {
+                const busSel = document.querySelector('#tripEditorBody #modalBusSelect');
+                const drvSel = document.querySelector('#tripEditorBody #modalDriverSelect');
+                const enabled = $('edIsEnabled');
+
+                if (enabled) {
+                    enabled.onchange = () => {
+                        if (enabled.checked) enforceEnableRulesUI("You cannot enable while Bus/Driver is None. Auto-disabled.");
+                        else showEditorWarning('');
+                    };
+                }
+
+                if (busSel) {
+                    busSel.onchange = () => {
+                        reservations[String(orderNo)] = reservations[String(orderNo)] || { busId: "", driverId: "" };
+                        reservations[String(orderNo)].busId = (busSel.value || "").toString();
+                        applyReservationToModal(orderNo);
+                        if (!busSel.value || busSel.value === "") {
+                            enforceEnableRulesUI("Bus set to None. Template auto-disabled so the bus becomes available to other trips.");
+                        } else {
+                            enforceEnableRulesUI("");
+                        }
+                    };
+                }
+
+                if (drvSel) {
+                    drvSel.onchange = () => {
+                        reservations[String(orderNo)] = reservations[String(orderNo)] || { busId: "", driverId: "" };
+                        reservations[String(orderNo)].driverId = (drvSel.value || "").toString();
+                        applyReservationToModal(orderNo);
+                        if (!drvSel.value || drvSel.value === "") {
+                            enforceEnableRulesUI("Driver set to None. Template auto-disabled so the driver becomes available to other trips.");
+                        } else {
+                            enforceEnableRulesUI("");
+                        }
+                    };
+                }
+            }
+
+            function fillSelect(selectEl, items, selectedValue) {
+                selectEl.innerHTML = '';
+                const opt0 = document.createElement('option');
+                opt0.value = '';
+                opt0.textContent = '-- Select --';
+                selectEl.appendChild(opt0);
+
+                (items || []).forEach(it => {
+                    const val = (it?.value ?? it?.Value ?? '').toString();
+                    const txt = (it?.text ?? it?.Text ?? '').toString();
+                    const dis = (it?.disabled ?? it?.Disabled ?? false) === true;
+                    const o = document.createElement('option');
+                    o.value = val;
+                    o.textContent = txt;
+                    if (dis) o.disabled = true;
+                    selectEl.appendChild(o);
+                });
+
+                const sel = (selectedValue ?? '').toString().trim().toLowerCase();
+                if (sel) {
+                    const opt = [...selectEl.options].find(x => (x.value || '').toLowerCase() === sel);
+                    if (opt) selectEl.value = opt.value;
+                } else {
+                    selectEl.value = '';
+                }
+            }
+
+            function setMiniCoords(lat, lng) {
+                const mini = $('modalPickupMiniInfo');
+                if (!mini) return;
+                if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng))
+                    mini.textContent = `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+                else mini.textContent = '';
+            }
+
+            // ✅ Price Fields Logic
+            function updatePriceFields() {
+                const priceTypeGo = document.getElementById('priceTypeGo');
+                const priceTypeReturn = document.getElementById('priceTypeReturn');
+                const priceTypeRound = document.getElementById('priceTypeRound');
+
+                const fieldGoPrice = document.getElementById('fieldGoPrice');
+                const fieldReturnPrice = document.getElementById('fieldReturnPrice');
+                const fieldRoundPrice = document.getElementById('fieldRoundPrice');
+
+                if (!priceTypeGo || !priceTypeReturn || !priceTypeRound) return;
+
+                if (priceTypeGo.checked) {
+                    fieldGoPrice.style.display = 'block';
+                    fieldReturnPrice.style.display = 'none';
+                    fieldRoundPrice.style.display = 'none';
+
+                    if (document.querySelector('[name="SeatPriceReturn"]'))
+                        document.querySelector('[name="SeatPriceReturn"]').value = '';
+                    if (document.querySelector('[name="SeatPriceRound"]'))
+                        document.querySelector('[name="SeatPriceRound"]').value = '';
+                }
+                else if (priceTypeReturn.checked) {
+                    fieldGoPrice.style.display = 'none';
+                    fieldReturnPrice.style.display = 'block';
+                    fieldRoundPrice.style.display = 'none';
+
+                    if (document.querySelector('[name="SeatPriceGo"]'))
+                        document.querySelector('[name="SeatPriceGo"]').value = '';
+                    if (document.querySelector('[name="SeatPriceRound"]'))
+                        document.querySelector('[name="SeatPriceRound"]').value = '';
+                }
+                else if (priceTypeRound.checked) {
+                    fieldGoPrice.style.display = 'block';
+                    fieldReturnPrice.style.display = 'block';
+                    fieldRoundPrice.style.display = 'block';
+                }
+            }
+
+            function setEditorFromTemplate(t, planId, checkDate) {
+                showEditorWarning('');
+                setServerError('');
+
+                $('edPlanId').value = planId || '';
+                $('edId').value = (t?.id ? String(t.id) : "");
+                $('edOrderNo').value = (t?.orderNo ?? 0);
+                $('edCheckDate').value = checkDate || '';
+
+                $('edTitle').textContent = `Template #${t?.orderNo ?? ''}`;
+                $('edDateText').textContent = `Date check: ${checkDate ? checkDate : 'Not selected'}`;
+
+                $('edIsEnabled').checked = !!t?.isEnabled;
+
+                $('edTripName').value = (t?.tripName ?? '');
+                $('edDepartTime').value = (t?.departTime ?? '');
+                $('edFromCity').value = (t?.fromCity ?? '');
+                $('edToCity').value = (t?.toCity ?? '');
+
+                // ✅ Set Price Type
+                const priceType = t?.priceType || 3;
+                const priceTypeGo = document.getElementById('priceTypeGo');
+                const priceTypeReturn = document.getElementById('priceTypeReturn');
+                const priceTypeRound = document.getElementById('priceTypeRound');
+
+                if (priceTypeGo && priceTypeReturn && priceTypeRound) {
+                    if (priceType == 1) priceTypeGo.checked = true;
+                    else if (priceType == 2) priceTypeReturn.checked = true;
+                    else priceTypeRound.checked = true;
+                }
+
+                const defaultText = 'First El-Helaly at Go Bus Company';
+                $('modalPickupPlace').value = (t?.pickupPlace && String(t.pickupPlace).trim()) ? t.pickupPlace : defaultText;
+
+                $('modalPickupLat').value = (t?.pickupLat ?? '') === null ? '' : (t?.pickupLat ?? '');
+                $('modalPickupLon').value = (t?.pickupLon ?? '') === null ? '' : (t?.pickupLon ?? '');
+
+                const lat = parseFloat($('modalPickupLat').value || '');
+                const lng = parseFloat($('modalPickupLon').value || '');
+                setMiniCoords(lat, lng);
+
+                $('edSeatPriceGo').value = (t?.seatPriceGo ?? '');
+                $('edSeatPriceReturn').value = (t?.seatPriceReturn ?? '');
+                $('edSeatPriceRound').value = (t?.seatPriceRound ?? '');
+
+                $('edDropoffPlace').value = (t?.dropoffPlace ?? '');
+                $('edNotes').value = (t?.notes ?? '');
+
+                // ✅ Update price fields visibility
+                updatePriceFields();
+            }
+
+            // ========================= Location Picker =========================
+            let tplMap = null;
+            let tplMarker = null;
+
+            function escapeHtml(str) {
+                return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+                                  .replaceAll('"','&quot;').replaceAll("'","&#039;");
+            }
+
+            function tplSetError(msg) { $('tplSearchErrorText').textContent = msg; $('tplSearchError').style.display = 'block'; }
+            function tplClearError() { $('tplSearchError').style.display = 'none'; $('tplSearchErrorText').textContent = ''; }
+
+            async function reverseGeocodeOrNull(lat, lng) {
+                try {
+                    const r = await fetch(`/Trips/ReverseGeocode?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`, {
+                        headers: { "X-Requested-With": "XMLHttpRequest" }
+                    });
+                    if (!r.ok) return null;
+                    const j = await r.json();
+                    const addr = (j && j.address) ? String(j.address) : '';
+                    return addr ? addr : null;
+                } catch { return null; }
+            }
+
+            async function writeBackPickup(lat, lng, labelMaybe) {
+                $('modalPickupLat').value = String(lat);
+                $('modalPickupLon').value = String(lng);
+                setMiniCoords(lat, lng);
+
+                let text = (labelMaybe || '').trim();
+                if (!text) {
+                    const addr = await reverseGeocodeOrNull(lat, lng);
+                    if (addr) text = addr;
+                }
+                if (text) $('modalPickupPlace').value = text;
+
+                $('tplTmpLat').value = String(lat);
+                $('tplTmpLng').value = String(lng);
+                $('tplTmpCoordsText').textContent = `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+                $('tplSelectedDetails').textContent = text ? text : `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+                $('tplModalStatus').textContent = 'Location selected (auto-updated).';
+            }
+
+            function tplInitMapIfNeeded(defaultLat, defaultLng) {
+                if (tplMap) return;
+
+                tplMap = L.map('tplMap', { zoomControl: true }).setView([defaultLat, defaultLng], 12);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap &copy; CARTO'
+                }).addTo(tplMap);
+
+                tplMarker = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(tplMap);
+
+                tplMap.on('click', async function (e) {
+                    tplClearError();
+                    tplMarker.setLatLng(e.latlng);
+                    await writeBackPickup(e.latlng.lat, e.latlng.lng, "");
+                });
+
+                tplMarker.on('dragend', async function () {
+                    tplClearError();
+                    const p = tplMarker.getLatLng();
+                    await writeBackPickup(p.lat, p.lng, "");
+                });
+            }
+
+            async function tplSearch(query) {
+                tplClearError();
+                const q = (query || '').trim();
+                if (!q) { $('tplSearchStatus').textContent = 'Type a place name then click Search.'; $('tplResultsWrap').style.display = 'none'; return; }
+
+                $('tplSearchStatus').textContent = 'Searching...';
+                $('tplBtnSearch').disabled = true;
+                $('tplResultsWrap').style.display = 'none';
+                $('tplResults').innerHTML = '';
+
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`;
+                    const res = await fetch(url, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json', 'Accept-Language': 'ar,en' }
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                    const data = await res.json();
+                    if (!Array.isArray(data) || data.length === 0) { $('tplSearchStatus').textContent = 'No results. Try adding city/governorate.'; return; }
+
+                    $('tplSearchStatus').textContent = `Found ${data.length} results. Click one.`;
+                    $('tplResultsWrap').style.display = 'block';
+
+                    for (const item of data) {
+                        const lat = parseFloat(item.lat);
+                        const lng = parseFloat(item.lon);
+                        const display = item.display_name || 'Unknown';
+
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'list-group-item list-group-item-action';
+                        btn.innerHTML = `<div class="fw-semibold small">${escapeHtml(display)}</div><div class="text-muted small">Lat: ${lat.toFixed(5)} , Lng: ${lng.toFixed(5)}</div>`;
+
+                        btn.addEventListener('click', async function () {
+                            tplMarker.setLatLng([lat, lng]);
+                            tplMap.setView([lat, lng], 16);
+                            $('tplResultsWrap').style.display = 'none';
+                            await writeBackPickup(lat, lng, display);
+                        });
+
+                        $('tplResults').appendChild(btn);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    $('tplSearchStatus').textContent = 'Search failed.';
+                    tplSetError('Search blocked (CSP/CORS) أو rate-limit من Nominatim.');
+                } finally {
+                    $('tplBtnSearch').disabled = false;
+                }
+            }
+
+            function openTemplateMap() {
+                const btnOpen = document.querySelector('#tripEditorBody #btnOpenTemplateLocation');
+                if (!btnOpen) return;
+
+                const defLat = parseFloat(btnOpen.getAttribute('data-default-lat') || '@defaultLat.ToString(CultureInfo.InvariantCulture)');
+                const defLng = parseFloat(btnOpen.getAttribute('data-default-lng') || '@defaultLng.ToString(CultureInfo.InvariantCulture)');
+
+                templateLocationModal.show();
+
+                setTimeout(async () => {
+                    tplInitMapIfNeeded(defLat, defLng);
+                    tplMap.invalidateSize();
+
+                    const curLat = parseFloat(($('modalPickupLat').value || '').toString());
+                    const curLng = parseFloat(($('modalPickupLon').value || '').toString());
+                    const placeText = ($('modalPickupPlace').value || '').toString();
+
+                    if (!isNaN(curLat) && !isNaN(curLng)) {
+                        tplMarker.setLatLng([curLat, curLng]);
+                        tplMap.setView([curLat, curLng], 14);
+                        await writeBackPickup(curLat, curLng, placeText);
+                    } else {
+                        tplMarker.setLatLng([defLat, defLng]);
+                        tplMap.setView([defLat, defLng], 12);
+                        $('tplSelectedDetails').textContent = 'Default location loaded.';
+                        $('tplModalStatus').textContent = 'Search place or click on map.';
+                        $('tplTmpCoordsText').textContent = '';
+                        $('tplTmpLat').value = '';
+                        $('tplTmpLng').value = '';
+                    }
+                }, 250);
+            }
+
+            // Bind search buttons
+            $('tplBtnSearch')?.addEventListener('click', () => tplSearch($('tplTxtSearch').value));
+            $('tplTxtSearch')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); tplSearch($('tplTxtSearch').value); } });
+
+            $('tplBtnGps')?.addEventListener('click', function () {
+                tplClearError();
+                if (!navigator.geolocation) { $('tplModalStatus').textContent = 'GPS is not supported. Use search or click the map.'; return; }
+
+                this.disabled = true;
+                $('tplModalStatus').textContent = 'Detecting GPS...';
+
+                navigator.geolocation.getCurrentPosition(
+                    async (pos) => {
+                        try {
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
+                            tplMarker.setLatLng([lat, lng]);
+                            tplMap.setView([lat, lng], 17);
+                            await writeBackPickup(lat, lng, "");
+                        } finally { this.disabled = false; }
+                    },
+                    (err) => {
+                        this.disabled = false;
+                        $('tplModalStatus').textContent = 'Could not use GPS. Use search or click the map.';
+                        console.log(err);
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+            });
+
+            $('tplBtnClear')?.addEventListener('click', function () {
+                tplClearError();
+                $('modalPickupLat').value = '';
+                $('modalPickupLon').value = '';
+                setMiniCoords(NaN, NaN);
+
+                $('tplTmpLat').value = '';
+                $('tplTmpLng').value = '';
+                $('tplTmpCoordsText').textContent = '';
+                $('tplSelectedDetails').textContent = 'No selection yet.';
+                $('tplModalStatus').textContent = 'Cleared. Search or click map.';
+                $('tplResultsWrap').style.display = 'none';
+            });
+
+            $('tplBtnDone')?.addEventListener('click', function () { templateLocationModal.hide(); });
+
+            async function attachDetailsButtons() {
+                const busBtn = document.querySelector('#tripEditorBody #modalBusDetailsBtn');
+                const drvBtn = document.querySelector('#tripEditorBody #modalDriverDetailsBtn');
+
+                if (busBtn) {
+                    busBtn.onclick = async function () {
+                        const id = document.querySelector('#tripEditorBody #modalBusSelect')?.value || "";
+                        if (!id || id === "") { showEditorWarning("No bus selected."); return; }
+                        $('busModalBody').innerHTML = "Loading...";
+                        const html = await fetchHtml(`/Trips/BusDetailsModal?id=${encodeURIComponent(id)}`);
+                        $('busModalBody').innerHTML = (html.ok && html.html) ? html.html : "Failed to load.";
+                        busModal.show();
+                    };
+                }
+
+                if (drvBtn) {
+                    drvBtn.onclick = async function () {
+                        const id = document.querySelector('#tripEditorBody #modalDriverSelect')?.value || "";
+                        if (!id || id === "") { showEditorWarning("No driver selected."); return; }
+                        $('driverModalBody').innerHTML = "Loading...";
+                        const html = await fetchHtml(`/Trips/DriverDetailsModal?id=${encodeURIComponent(id)}`);
+                        $('driverModalBody').innerHTML = (html.ok && html.html) ? html.html : "Failed to load.";
+                        driverModal.show();
+                    };
+                }
+            }
+
+            async function openEditor(orderNo) {
+                if (!isPlanEnabledFromUI()) return;
+
+                const mode = getPlannerMode();
+                const date = (mode === "date") ? currentDateFromUI() : "";
+                const planId = getPlanId();
+
+                showEditorWarning('');
+                setServerError('');
+                $('edTitle').textContent = 'Loading...';
+                $('edDateText').textContent = '';
+                tripEditorModal.show();
+
+                const url = `/Trips/AutoTripTemplateData?planId=${encodeURIComponent(planId)}&orderNo=${encodeURIComponent(orderNo)}&checkDate=${encodeURIComponent(date)}`;
+                const r = await fetchJson(url);
+
+                if (!r.ok || !r.json) {
+                    showEditorWarning('Failed to load template data.');
+                    return;
+                }
+
+                const t = r.json.template || {};
+                setEditorFromTemplate(t, planId, date);
+
+                fillSelect($('modalBusSelect'), r.json.buses || [], t.busId);
+                fillSelect($('modalDriverSelect'), r.json.drivers || [], t.driverId);
+
+                reservations[String(orderNo)] = reservations[String(orderNo)] || { busId: "", driverId: "" };
+                reservations[String(orderNo)].busId = ($('modalBusSelect').value || "").toString();
+                reservations[String(orderNo)].driverId = ($('modalDriverSelect').value || "").toString();
+
+                applyReservationToModal(orderNo);
+                attachModalChangeHandlers(orderNo);
+                await attachDetailsButtons();
+
+                enforceEnableRulesUI("Template was Enabled but Bus/Driver is None. Auto-disabled.");
+            }
+
+            async function saveEditor() {
+                const form = document.querySelector('#tripEditorBody form#autoTripEditorForm');
+                if (!form) return;
+
+                const mode = getPlannerMode();
+                const check = (mode === "date") ? currentDateFromUI() : "";
+                const edCheck = document.getElementById('edCheckDate');
+                if (edCheck) edCheck.value = check;
+
+                const busSel = document.getElementById('modalBusSelect');
+                const drvSel = document.getElementById('modalDriverSelect');
+                const enabledCheckbox = document.getElementById('edIsEnabled');
+
+                const originalEnabled = enabledCheckbox?.checked === true;
+
+                const busNone = !busSel?.value || busSel.value === "";
+                const drvNone = !drvSel?.value || drvSel.value === "";
+                const latEl = document.getElementById('modalPickupLat');
+                const lonEl = document.getElementById('modalPickupLon');
+                const lat = (latEl?.value || "").trim();
+                const lon = (lonEl?.value || "").trim();
+                const coordsMissing = (!lat || !lon);
+
+                if (originalEnabled && (busNone || drvNone || coordsMissing)) {
+                    enabledCheckbox.checked = false;
+                }
+
+                enforceEnableRulesUI("Cannot save Enabled with Bus/Driver/Location missing. Auto-disabled before saving.");
+
+                const fd = new FormData(form);
+                const enabledChecked = document.getElementById('edIsEnabled')?.checked === true;
+                fd.set("IsEnabled", enabledChecked ? "true" : "false");
+
+                let busVal = busSel?.value || "";
+                let drvVal = drvSel?.value || "";
+
+                fd.set("BusId", busVal);
+                fd.set("DriverId", drvVal);
+
+                const r = await fetchHtml(`/Trips/SaveAutoTripTemplateModal`, { method: "POST", body: fd });
+
+                if (!r.ok && r.status === 400 && r.html) {
+                    document.getElementById('tripEditorBody').innerHTML = r.html;
+                    return;
+                }
+
+                if (!r.ok) {
+                    showEditorWarning("Save failed.");
+                    setServerError(r.html ? r.html : 'Save failed.');
+                    return;
+                }
+
+                if (r.html) {
+                    plannerInner().innerHTML = r.html;
+                    syncReservationsFromPlanner();
+                    setPlanBodyEnabledUI();
+                    tripEditorModal.hide();
+                    if (r.warning) alert(r.warning);
+                }
+            }
+
+            async function moveOrder(orderNo, dir) {
+                if (!isPlanEnabledFromUI()) return;
+
+                const mode = getPlannerMode();
+                const date = (mode === "date") ? currentDateFromUI() : "";
+                const token = antiForgeryToken();
+                if (!token) return;
+
+                const fd = new FormData();
+                fd.append("__RequestVerificationToken", token);
+                fd.append("planId", getPlanId());
+                fd.append("orderNo", String(orderNo));
+                fd.append("direction", dir);
+                fd.append("checkDate", date);
+
+                const r = await fetchHtml(`/Trips/MoveTemplateOrder`, { method: "POST", body: fd });
+
+                if (r.ok && r.html) {
+                    plannerInner().innerHTML = r.html;
+                    syncReservationsFromPlanner();
+                    setPlanBodyEnabledUI();
+                }
+            }
+
+            // ✅ Add event listeners for price type radios
+            document.querySelectorAll('input[name="PriceType"]').forEach(radio => {
+                radio.addEventListener('change', updatePriceFields);
+            });
+
+            document.addEventListener('click', function (e) {
+                const editBtn = e.target.closest('.btn-edit-trip');
+                if (editBtn) {
+                    const orderNo = parseInt(editBtn.getAttribute('data-orderno') || "0");
+                    if (orderNo) openEditor(orderNo);
+                    return;
+                }
+
+                const saveBtn = e.target.closest('#btnSaveTripEditor');
+                if (saveBtn) { saveEditor(); return; }
+
+                const upBtn = e.target.closest('.btn-move-up');
+                if (upBtn) {
+                    const orderNo = parseInt(upBtn.getAttribute('data-orderno') || "0");
+                    if (orderNo) moveOrder(orderNo, "up");
+                    return;
+                }
+
+                const downBtn = e.target.closest('.btn-move-down');
+                if (downBtn) {
+                    const orderNo = parseInt(downBtn.getAttribute('data-orderno') || "0");
+                    if (orderNo) moveOrder(orderNo, "down");
+                    return;
+                }
+
+                const openMapBtn = e.target.closest('#tripEditorBody #btnOpenTemplateLocation');
+                if (openMapBtn) { openTemplateMap(); return; }
+            });
+
+            document.addEventListener('change', function (e) {
+                if (e.target && e.target.id === 'autoPlanEnabled') { setPlanBodyEnabledUI(); return; }
+
+                if (e.target && e.target.name === 'plannerMode') {
+                    const mode = getPlannerMode();
+                    const wrap = document.querySelector('#plannerInner #checkDateWrap');
+                    const inp = document.querySelector('#plannerInner #checkDateInput');
+
+                    if (mode === "date") {
+                        if (wrap) wrap.style.display = "";
+                        if (inp && !inp.value) {
+                            const d = new Date();
+                            const yyyy = d.getFullYear();
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            inp.value = `${yyyy}-${mm}-${dd}`;
+                        }
+                    } else {
+                        if (wrap) wrap.style.display = "none";
+                        if (inp) inp.value = "";
+                    }
+
+                    loadPlanner();
+                    return;
+                }
+
+                if (e.target && e.target.id === 'checkDateInput') {
+                    if (getPlannerMode() === "date") loadPlanner();
+                    return;
+                }
+
+                if (e.target && e.target.id === 'scheduleTypeSelect') {
+                    const v = (e.target.value || "").toString();
+                    const wrap = document.querySelector('#plannerInner #planSpecificDateWrap');
+                    const sd = document.querySelector('#plannerInner #specificDateInput');
+                    const msg = document.querySelector('#plannerInner #specificDateMsg');
+
+                    if (v === "2") {
+                        if (wrap) wrap.style.display = "";
+                        if (sd) sd.required = true;
+                        if (msg) msg.style.display = "none";
+                    } else {
+                        if (wrap) wrap.style.display = "none";
+                        if (sd) { sd.value = ""; sd.required = false; }
+                        if (msg) msg.style.display = "none";
+                    }
+                    return;
+                }
+            });
+
+            syncReservationsFromPlanner();
+            setPlanBodyEnabledUI();
+                    // أضف هذه الدالة في نهاية الـ JavaScript الحالي داخل (function() { ... })();
+
+        // ✅ Show warning messages in appropriate places
+        function showFieldWarning(fieldId, message) {
+            const field = document.getElementById(fieldId);
+            if (!field) return;
+
+            // Remove any existing warning
+            const existingWarning = field.parentElement.querySelector('.field-warning');
+            if (existingWarning) existingWarning.remove();
+
+            // Create warning element
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'field-warning text-danger small mt-1';
+            warningDiv.innerHTML = `<i class="bi bi-exclamation-circle me-1"></i>${message}`;
+
+            // Insert after the field
+            field.parentElement.appendChild(warningDiv);
+        }
+
+        function clearFieldWarnings() {
+            document.querySelectorAll('.field-warning').forEach(el => el.remove());
+        }
+
+        // Check for price warnings before save
+        function validatePricesBeforeSave() {
+            const priceTypeGo = document.getElementById('priceTypeGo');
+            const priceTypeReturn = document.getElementById('priceTypeReturn');
+            const priceTypeRound = document.getElementById('priceTypeRound');
+
+            const goPrice = document.getElementById('edSeatPriceGo');
+            const returnPrice = document.getElementById('edSeatPriceReturn');
+            const roundPrice = document.getElementById('edSeatPriceRound');
+
+            let hasError = false;
+            clearFieldWarnings();
+
+            if (priceTypeGo.checked) {
+                if (!goPrice.value || parseFloat(goPrice.value) <= 0) {
+                    showFieldWarning('edSeatPriceGo', 'Go price is required');
+                    hasError = true;
+                }
+            }
+            else if (priceTypeReturn.checked) {
+                if (!returnPrice.value || parseFloat(returnPrice.value) <= 0) {
+                    showFieldWarning('edSeatPriceReturn', 'Return price is required');
+                    hasError = true;
+                }
+            }
+            else if (priceTypeRound.checked) {
+                if (!goPrice.value || parseFloat(goPrice.value) <= 0) {
+                    showFieldWarning('edSeatPriceGo', 'Go price is required for round trip');
+                    hasError = true;
+                }
+                if (!returnPrice.value || parseFloat(returnPrice.value) <= 0) {
+                    showFieldWarning('edSeatPriceReturn', 'Return price is required for round trip');
+                    hasError = true;
+                }
+            }
+
+            return !hasError;
+        }
+
+        // Override saveEditor to validate prices first
+        const originalSaveEditor = saveEditor;
+        saveEditor = async function() {
+            if (!validatePricesBeforeSave()) {
+                showEditorWarning('Please fill in all required price fields before saving.');
+                return;
+            }
+            await originalSaveEditor();
+        };
+        })();
+    </script>
+
+    <style nonce="@nonce">
+        .map-box {
+            height: 520px;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid rgba(15,23,42,.10);
+        }
+
+        .selected-box {
+            background: rgba(248,250,252,.85);
+            border: 1px solid rgba(15,23,42,.08);
+        }
+
+        /* Price fields animation */
+        .price-field {
+            transition: all 0.3s ease;
+        }
+        /* أضف هذا في قسم الـ Style */
+        .field-warning {
+            animation: fadeIn 0.3s ease;
+            padding: 4px 8px;
+            background-color: rgba(220, 53, 69, 0.05);
+            border-radius: 4px;
+            border-left: 3px solid #dc3545;
+        }
+
+        @@keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-warning ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .alert-warning li {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+            .alert-warning li:last-child {
+                border-bottom: none;
+            }
+
+            .alert-warning li i {
+                margin-right: 8px;
+                color: #856404;
+            }
+    </style>
+}

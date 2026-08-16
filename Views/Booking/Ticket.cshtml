@@ -1,0 +1,627 @@
+﻿@using System.Globalization
+@model NoufirTours.Models.Bookings.BookingTicketModel
+@{
+    Layout = null;
+
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    string V(string? s) => string.IsNullOrWhiteSpace(s) ? "-" : s.Trim();
+    string Money(decimal v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    bool hasReturn = Model.BookingType == 3 && Model.ReturnTripId.HasValue;
+
+    string typeAr = Model.BookingType == 1 ? "ذهاب فقط"
+                 : Model.BookingType == 2 ? "عودة فقط"
+                 : "ذهاب وعودة";
+
+    string typeEn = Model.BookingType == 1 ? "GO"
+                 : Model.BookingType == 2 ? "RETURN"
+                 : "ROUND";
+
+    // ✅ NEW: Type text for the table (Go only / Return Only / Round)
+    string typeCellEn = Model.BookingType == 1 ? "Go Only"
+                    : Model.BookingType == 2 ? "Return Only"
+                    : "Round";
+}
+
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>تذكرة أتوبيس - @Model.BookingId</title>
+
+    <style nonce="@nonce">
+        :root {
+            --ink: #111827;
+            --muted: #6b7280;
+            --line: rgba(17,24,39,.18);
+            --soft: rgba(17,24,39,.06);
+            --accent: #ef4444;
+            --brand-blue: #0d6efd;
+            --brand-yellow: #ffc107;
+            --page-w: 95mm;
+            --page-h: 135mm;
+            --ticket-w: 95mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Cairo","Tajawal",Arial,sans-serif;
+            color: var(--ink);
+            background: #f3f4f6;
+        }
+
+        .screen-wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+        }
+
+        @@page {
+            size: 95mm 135mm;
+            margin: 3mm;
+        }
+
+        @@media print {
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            html, body {
+                width: var(--page-w);
+                height: var(--page-h);
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #fff !important;
+            }
+
+            .screen-wrap {
+                min-height: auto !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                display: flex !important;
+                align-items: flex-start !important;
+                justify-content: center !important;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .print-page {
+                width: var(--page-w) !important;
+                height: var(--page-h) !important;
+                display: flex !important;
+                align-items: flex-start !important;
+                justify-content: center !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .ticket {
+                box-shadow: none !important;
+                transform: none !important;
+                transform-origin: initial !important;
+            }
+        }
+
+        .print-page {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .ticket {
+            width: var(--ticket-w);
+            max-width: var(--ticket-w);
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 14px 30px rgba(0,0,0,.12);
+            position: relative;
+        }
+
+        .wm {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(-20deg);
+            font-weight: 900;
+            font-size: 28px;
+            letter-spacing: 4px;
+            opacity: .05;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .t-head {
+            padding: 7mm 6mm 5mm;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .brand-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 5px;
+        }
+
+        .logo {
+            width: 12mm;
+            height: 12mm;
+            border: 1px solid var(--line);
+            border-radius: 4mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            background: #fff;
+            letter-spacing: .6px;
+            font-size: 12px;
+        }
+
+        .brand-center h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 900;
+            line-height: 1.05;
+            display: inline-flex;
+            gap: 6px;
+            align-items: baseline;
+            direction: ltr;
+        }
+
+        .brand-noufir {
+            color: var(--brand-blue);
+        }
+
+        .brand-tours {
+            color: var(--brand-yellow);
+        }
+
+        .brand-center .sub {
+            margin-top: 0;
+            font-size: 10.5px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .meta-line {
+            margin-top: 5mm;
+            border-top: 1px solid var(--line);
+            padding-top: 5mm;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 10.5px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+            .meta-line b {
+                color: var(--ink);
+            }
+
+        .t-body {
+            padding: 6mm;
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 10px;
+        }
+
+        /* ✅ UPDATED: make separators clearer (table look) */
+        .field {
+            border: 1px solid rgba(17,24,39,.16);
+            background: rgba(0,0,0,.015);
+            border-radius: 10px;
+            padding: 7px 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+        }
+
+        .label {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: center;
+            gap: 10px;
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--muted);
+        }
+
+            .label span:first-child {
+                text-align: left;
+                direction: ltr;
+            }
+
+            .label span:last-child {
+                text-align: right;
+                direction: rtl;
+            }
+
+        .value {
+            margin-top: 2px;
+            font-size: 12px;
+            font-weight: 900;
+            line-height: 1.2;
+            width: 100%;
+            text-align: center;
+            word-break: break-word;
+        }
+
+        .tag {
+            margin: 5mm 0;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(0,0,0,.02);
+            text-align: center;
+            padding: 6px 10px;
+            font-weight: 900;
+            font-size: 12.5px;
+        }
+
+        .perf {
+            margin: 5mm 0 5mm;
+            border-top: 2px dashed rgba(17,24,39,.28);
+            position: relative;
+        }
+
+            .perf:before, .perf:after {
+                content: "";
+                position: absolute;
+                top: -8px;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background: #fff;
+                border: 1px solid var(--line);
+            }
+
+            .perf:before {
+                right: -7px;
+            }
+
+            .perf:after {
+                left: -7px;
+            }
+
+        .qr-row {
+            margin-top: 4mm;
+            display: grid;
+            grid-template-columns: 26mm 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .qr-box {
+            width: 26mm;
+            height: 26mm;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+            .qr-box img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+        /* ✅ code text under QR */
+        .qr-code-text {
+            margin-top: 6px;
+            text-align: center;
+            font-weight: 900;
+            font-size: 10.5px;
+            color: var(--ink);
+            letter-spacing: 1px;
+            direction: ltr;
+            user-select: text;
+        }
+
+            .qr-code-text .k {
+                display: block;
+                font-size: 9px;
+                color: var(--muted);
+                font-weight: 900;
+                letter-spacing: .5px;
+                margin-bottom: 1px;
+            }
+
+        .sum {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 7px 9px;
+            background: rgba(0,0,0,.02);
+        }
+
+        .sum-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 5px 0;
+            border-bottom: 1px dashed var(--line);
+            font-weight: 900;
+            font-size: 11.5px;
+        }
+
+            .sum-row:last-child {
+                border-bottom: 0;
+            }
+
+            .sum-row .k {
+                color: var(--muted);
+                font-size: 10.5px;
+            }
+
+            .sum-row.total .v {
+                color: var(--accent);
+                font-size: 13px;
+            }
+
+        .t-foot {
+            padding: 4mm 6mm;
+            border-top: 1px solid var(--line);
+            background: rgba(0,0,0,.02);
+            color: var(--muted);
+            font-weight: 800;
+            text-align: center;
+        }
+
+            .t-foot b {
+                color: var(--ink);
+            }
+
+        .foot-ticketno {
+            margin-bottom: 4px;
+            padding-bottom: 4px;
+            border-bottom: 1px dashed var(--line);
+        }
+
+            .foot-ticketno .k {
+                display: block;
+                font-size: 9.2px;
+                font-weight: 900;
+                margin-bottom: 1px;
+            }
+
+            .foot-ticketno .v {
+                display: block;
+                font-weight: 900;
+                font-size: 10.2px;
+                color: var(--ink);
+                word-break: break-all;
+            }
+
+        .foot-line {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            font-size: 9.8px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 14px;
+        }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: #fff;
+            border-radius: 999px;
+            padding: 10px 16px;
+            font-weight: 900;
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--ink);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .btn.primary {
+                background: var(--ink);
+                color: #fff;
+                border-color: transparent;
+            }
+    </style>
+</head>
+
+<body>
+    <div class="screen-wrap">
+        <div class="print-page">
+            <div class="ticket" role="document" aria-label="Bus Ticket">
+                <div class="wm">NOUFIR TOURS</div>
+
+                <div class="t-head">
+                    <div class="brand-center">
+                        <h1>
+                            <span class="brand-noufir">Noufir</span>
+                            <span class="brand-tours">Tours</span>
+                        </h1>
+                        <div class="sub">Bus Transportation • تذكرة أتوبيس</div>
+                    </div>
+
+                    <div class="meta-line">
+                        <span>Issued: <b>@V(Model.CreatedAtText)</b></span>
+                        <span>Type: <b>@typeEn</b></span>
+                    </div>
+                </div>
+
+                <div class="t-body">
+                    <div class="grid2">
+                        <div class="field">
+                            <div class="label"><span>From</span><span>من</span></div>
+                            <div class="value">@V(Model.MainFromCity)</div>
+                        </div>
+                        <div class="field">
+                            <div class="label"><span>To</span><span>إلى</span></div>
+                            <div class="value">@V(Model.MainToCity)</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label"><span>Destination</span><span>مكان الوصول</span></div>
+                            <div class="value">@V(Model.DestinationPlaceName)</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label"><span>Date</span><span>التاريخ</span></div>
+                            <div class="value">@V(Model.MainTripDate)</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label"><span>Time</span><span>الوقت</span></div>
+                            <div class="value">@V(Model.MainTripTime)</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label"><span>Trip</span><span>الرحلة</span></div>
+                            <div class="value">@V(Model.MainTripName)</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label"><span>Bus</span><span>الأتوبيس</span></div>
+                            <div class="value">@V(Model.MainBusName)</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label"><span>Seats</span><span>المقاعد</span></div>
+                            <div class="value">@V(Model.MainSeatsCsv)</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label"><span>Count</span><span>العدد</span></div>
+                            <div class="value">@Model.MainSeatsCount</div>
+                        </div>
+
+                        <!-- ✅ NEW: Type beside Count (same top table) -->
+                       @*  <div class="field">
+                            <div class="label"><span>Type</span><span>النوع</span></div>
+                            <div class="value" dir="ltr">@typeCellEn</div>
+                        </div> *@
+                    </div>
+
+                    @if (hasReturn)
+                    {
+                        <div class="grid2">
+                            <div class="field">
+                                <div class="label"><span>Return Date</span><span>تاريخ العودة</span></div>
+                                <div class="value">@V(Model.ReturnTripDate)</div>
+                            </div>
+                            
+                            <div class="field">
+                                <div class="label"><span>Bus Return</span><span>اتوبيس العودة</span></div>
+                                <div class="value">@V(Model.ReturnBusName)</div>
+                            </div>
+                           @*  <div class="field">
+                                <div class="label"><span>Return Time</span><span>وقت العودة</span></div>
+                                <div class="value">@V(Model.ReturnTripTime)</div>
+                            </div> *@
+
+                            <div class="field">
+                                <div class="label"><span>Return Destination</span><span>مكان التحرك</span></div>
+                                <div class="value">@V(Model.ReturnDestinationPlaceName)</div>
+                            </div>
+
+                            <div class="field">
+                                <div class="label"><span>Return Seats</span><span>مقاعد العودة</span></div>
+                                <div class="value">@V(Model.ReturnSeatsCsv)</div>
+                            </div>
+                            <div class="field">
+                                <div class="label"><span>Return Count</span><span>عدد العودة</span></div>
+                                <div class="value">@Model.ReturnSeatsCount</div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="perf"></div>
+
+                    <div class="qr-row">
+                        <div>
+                            <div class="qr-box">
+                                <img src="@Url.Action("TicketQr", "Booking", new { id = Model.BookingId })" alt="QR" />
+                            </div>
+
+                            <div class="qr-code-text">
+                                <span class="k">CODE • كود التذكرة</span>
+                                <span>@V(Model.TicketCode)</span>
+                            </div>
+                        </div>
+
+                        <div class="sum">
+                            <div class="sum-row">
+                                <div class="k">Customer • العميل</div>
+                                <div class="v">@V(Model.CustomerName)</div>
+                            </div>
+                            <div class="sum-row">
+                                <div class="k">Phone • الهاتف</div>
+                                <div class="v" dir="ltr">@V(Model.Phone)</div>
+                            </div>
+                            <div class="sum-row">
+                                <div class="k">Issued By • الموظف</div>
+                                <div class="v">@V(Model.CompanyFrom)</div>
+                            </div>
+                            <div class="sum-row total">
+                                <div class="k">TOTAL • الإجمالي</div>
+                                <div class="v">@Money(Model.TotalAmount) EGP</div>
+                            </div>
+                            <div class="sum-row total">
+                                <div class="k">Notes • ملاحظات</div>
+                                <div class="v">@Model.Description</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="t-foot">
+                    <div class="foot-line">
+                        <b>Noufir Tours</b>
+                        <span>•</span>
+                        <span>Support:</span>
+                        <span dir="ltr">@Model.phoneCompany</span>
+                    </div>
+
+                    <div style="margin-top:4px; font-size:9.2px;">
+                        هذه التذكرة صادرة من النظام ولا تحتاج توقيع • احتفظ بها للركوب
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="actions no-print">
+            <button class="btn primary" type="button" id="BtnPrintTicket">🖨️ طباعة</button>
+            <a class="btn" href="@Url.Action("Index", "Booking")">🔎 بحث</a>
+        </div>
+    </div>
+
+    <script nonce="@nonce">
+        (function () {
+            var btn = document.getElementById('BtnPrintTicket');
+            if (btn) btn.addEventListener('click', function () { window.print(); });
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1415 @@
+﻿@using System.Text.Json
+@model NoufirTours.Models.Trips.Buses.BusCreateEditMode
+
+@{
+    ViewData["Title"] = "Edit Bus";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    // Driver-like flags (from controller)
+    bool lockCore = Model.LockCoreFields;  // used in trips
+    bool isArchived = Model.IsArchived;    // deleted
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="mb-1">@ViewData["Title"]</h2>
+
+        @if (isArchived)
+        {
+            <div class="text-muted">
+                This bus is <b>Deleted (Archived)</b>. Editing is not allowed.
+            </div>
+        }
+        else if (lockCore)
+        {
+            <div class="text-muted">
+                This bus is used in trips. Only <b>Seat Role/Active</b> + <b>Specs</b> + <b>Notes</b> can be edited.
+            </div>
+        }
+        else
+        {
+            <div class="text-muted">Edit bus details + update seat layout.</div>
+        }
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary"
+           asp-controller="Trips"
+           asp-action="Buses"
+           data-nt-no-loader>
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+
+        <a class="btn btn-outline-info"
+           asp-controller="Trips"
+           asp-action="BusDetails"
+           asp-route-id="@Model.Id"
+           data-nt-no-loader>
+            <i class="bi bi-info-circle"></i> Details
+        </a>
+    </div>
+</div>
+
+@if (isArchived)
+{
+    <div class="alert alert-danger border-0 shadow-sm">
+        <i class="bi bi-trash3-fill me-2"></i>
+        This bus is <b>Deleted (Archived)</b>. Editing is not allowed. Please restore the bus first.
+    </div>
+}
+else if (lockCore)
+{
+    <div class="alert alert-warning border-0 shadow-sm">
+        <i class="bi bi-shield-lock me-2"></i>
+        You can only edit <b>Specs</b>, <b>Notes</b>, and <b>Seat Role/Active</b>.
+        Layout (add/move/delete/resize) is locked.
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <form asp-action="EditBus" asp-controller="Trips" method="post" id="busForm">
+            @Html.AntiForgeryToken()
+
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="LockCoreFields" />
+            <input type="hidden" asp-for="LockAllFields" />
+            <input type="hidden" asp-for="IsArchived" />
+
+            <!-- ========= BUS CORE FIELDS ========= -->
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label asp-for="BusNumber" class="form-label">Bus Name</label>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input asp-for="BusNumber" class="form-control" maxlength="30" placeholder="e.g. BUS-101" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="BusNumber" class="form-control" maxlength="30" placeholder="e.g. BUS-101" />
+                    }
+
+                    <span asp-validation-for="BusNumber" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label asp-for="ChassisNumber" class="form-label">Chassis Number</label>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input asp-for="ChassisNumber" class="form-control" maxlength="80" placeholder="e.g. JH4DA9450MS000000" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="ChassisNumber" class="form-control" maxlength="80" placeholder="e.g. JH4DA9450MS000000" />
+                    }
+
+                    <span asp-validation-for="ChassisNumber" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label asp-for="PlateNumber" class="form-label">Plate Number</label>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input asp-for="PlateNumber" class="form-control" maxlength="40" placeholder="e.g. 1234 ABC" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="PlateNumber" class="form-control" maxlength="40" placeholder="e.g. 1234 ABC" />
+                    }
+
+                    <span asp-validation-for="PlateNumber" class="text-danger"></span>
+                </div>
+            </div>
+
+            <hr class="my-3" />
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label asp-for="Manufacturer" class="form-label">Manufacturer</label>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input asp-for="Manufacturer" class="form-control" maxlength="60" placeholder="e.g. Mercedes" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="Manufacturer" class="form-control" maxlength="60" placeholder="e.g. Mercedes" />
+                    }
+
+                    <span asp-validation-for="Manufacturer" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label asp-for="ModelName" class="form-label">Model</label>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input asp-for="ModelName" class="form-control" maxlength="80" placeholder="e.g. Tourismo" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="ModelName" class="form-control" maxlength="80" placeholder="e.g. Tourismo" />
+                    }
+
+                    <span asp-validation-for="ModelName" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label asp-for="ModelYear" class="form-label">Model Year</label>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input asp-for="ModelYear" class="form-control" type="number" min="1950" max="2100" placeholder="e.g. 2022" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="ModelYear" class="form-control" type="number" min="1950" max="2100" placeholder="e.g. 2022" />
+                    }
+
+                    <span asp-validation-for="ModelYear" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label asp-for="BusType" class="form-label">Bus Type</label>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input asp-for="BusType" class="form-control" maxlength="60" placeholder="Coach / MiniBus / Van" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="BusType" class="form-control" maxlength="60" placeholder="Coach / MiniBus / Van" />
+                    }
+
+                    <span asp-validation-for="BusType" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label asp-for="SeatsCount" class="form-label">Seats Count</label>
+                    <input asp-for="SeatsCount"
+                           class="form-control"
+                           type="number"
+                           min="0" max="200"
+                           placeholder="Auto calculated"
+                           readonly />
+                    <div class="form-text">Auto calculated from your layout (Passenger active seats).</div>
+                    <span asp-validation-for="SeatsCount" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label asp-for="Color" class="form-label">Color</label>
+
+                    @if (isArchived || lockCore)
+                    {
+                        <input asp-for="Color" class="form-control" maxlength="40" placeholder="e.g. White" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="Color" class="form-control" maxlength="40" placeholder="e.g. White" />
+                    }
+
+                    <span asp-validation-for="Color" class="text-danger"></span>
+                </div>
+            </div>
+
+            <!-- ✅ Allowed when NOT archived. (Allowed even when lockCore) -->
+            <div class="mb-3">
+                <label asp-for="Specs" class="form-label">Specifications</label>
+                @if (isArchived)
+                {
+                    <textarea asp-for="Specs" class="form-control" rows="3" maxlength="1000" readonly></textarea>
+                }
+                else
+                {
+                    <textarea asp-for="Specs" class="form-control" rows="3" maxlength="1000"
+                              placeholder="AC, WiFi, TV, Toilet, Reclining seats, USB charging..."></textarea>
+                }
+                <span asp-validation-for="Specs" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Notes" class="form-label">Notes</label>
+                @if (isArchived)
+                {
+                    <textarea asp-for="Notes" class="form-control" rows="2" maxlength="1000" readonly></textarea>
+                }
+                else
+                {
+                    <textarea asp-for="Notes" class="form-control" rows="2" maxlength="1000"></textarea>
+                }
+                <span asp-validation-for="Notes" class="text-danger"></span>
+            </div>
+
+            <hr class="my-3" />
+
+            <!-- IMPORTANT: must post back -->
+            <input type="hidden" asp-for="LayoutWidth" id="layoutWidth" />
+            <input type="hidden" asp-for="LayoutHeight" id="layoutHeight" />
+
+            <!-- ========= PREVIEW + DESIGN ========= -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="bus-preview-wrap">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="text-muted small">
+                                @if (isArchived)
+                                {
+                                    <span>Archived: Designer is disabled.</span>
+                                }
+                                else if (lockCore)
+                                {
+                                    <span>Layout locked: you can only change <b>Seat Role</b> and <b>Seat Active</b>.</span>
+                                }
+                                else
+                                {
+                                    <span>Tip: Drag items inside the bus. Door appears outside the shell.</span>
+                                }
+                            </div>
+
+                            @if (isArchived)
+                            {
+                                <button type="button" class="btn btn-secondary rounded-pill px-4" disabled>
+                                    <i class="bi bi-lock"></i> Locked
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button"
+                                        id="openDesignerBtn"
+                                        class="btn btn-primary rounded-pill px-4"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#seatDesignerModal"
+                                        data-nt-no-loader>
+                                    <i class="bi bi-pencil-square"></i> Design Seats
+                                </button>
+                            }
+                        </div>
+
+                        <div class="preview-viewport">
+                            <div class="bus-center-stage">
+                                <div id="previewBusShell" class="bus-shell-portrait">
+                                    <div id="previewDoorLayer" class="door-layer"></div>
+                                    <div class="bus-interior">
+                                        <div id="previewGrid" class="grid"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="info-pill">
+                            <span><i class="bi bi-grid"></i> Grid: <b id="previewDimensions">@Model.LayoutWidth×@Model.LayoutHeight</b></span>
+                            <span><i class="bi bi-person"></i> Passenger Seats: <b id="previewSeatCount">0</b></span>
+                            <span><i class="bi bi-door-open"></i> Doors: <b id="previewDoorCount">0</b></span>
+                            <span><i class="bi bi-water"></i> WC: <b id="previewWcCount">0</b></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <input type="hidden" asp-for="SeatsJson" id="seatsJson" />
+            <div class="mb-2">
+                <span asp-validation-for="SeatsJson" class="text-danger"></span>
+            </div>
+
+            <!-- Save / Cancel -->
+            <div class="mt-3">
+                @if (isArchived)
+                {
+                    <button type="button" class="btn btn-secondary btn-lg w-100" disabled>
+                        Editing Locked (Archived)
+                    </button>
+                }
+                else
+                {
+                    <button type="submit" class="btn btn-primary btn-lg w-100" id="saveBusBtn">
+                        <i class="bi bi-check-circle"></i> Save Changes
+                    </button>
+                }
+
+                <a class="btn btn-outline-secondary btn-sm w-100 mt-2"
+                   asp-controller="Trips"
+                   asp-action="BusDetails"
+                   asp-route-id="@Model.Id"
+                   data-nt-no-loader>
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===================== MODAL ===================== -->
+<div class="modal fade" id="seatDesignerModal" tabindex="-1" aria-hidden="true"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bus-front"></i> Seat Designer - Top View</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" data-nt-no-loader></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-3">
+                    <!-- LEFT -->
+                    <div class="col-lg-3">
+
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <i class="bi bi-grid-3x3-gap-fill"></i> Layout Dimensions
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label class="form-label">Width</label>
+                                        <input type="number" class="form-control" id="modalLayoutW" min="1" max="30" value="@Model.LayoutWidth" />
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Height</label>
+                                        <input type="number" class="form-control" id="modalLayoutH" min="1" max="60" value="@Model.LayoutHeight" />
+                                    </div>
+                                </div>
+
+                                <div class="text-muted small mt-2">
+                                    @if (isArchived)
+                                    {
+                                        <span>Archived. Designer is read-only.</span>
+                                    }
+                                    else if (lockCore)
+                                    {
+                                        <span>Locked. Grid resizing is disabled.</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Resize grid (items will be clamped).</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-header bg-secondary text-white">
+                                <i class="bi bi-tools"></i> Toolbox (Drag to bus)
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex flex-wrap gap-2">
+                                    <div draggable="true" data-tool="Seat" class="btn btn-sm btn-primary" style="cursor:grab;user-select:none;" data-nt-no-loader>
+                                        <i class="bi bi-person"></i> Seat
+                                    </div>
+
+                                    <div draggable="true" data-tool="Door" class="btn btn-sm btn-warning" style="cursor:grab;user-select:none;" data-nt-no-loader>
+                                        <i class="bi bi-door-open"></i> Bus Door
+                                    </div>
+
+                                    <div draggable="true" data-tool="WC" class="btn btn-sm btn-outline-secondary" style="cursor:grab;user-select:none;" data-nt-no-loader>
+                                        <i class="bi bi-water"></i> WC
+                                    </div>
+                                </div>
+
+                                <hr class="my-2" />
+
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="deleteBtn" disabled data-nt-no-loader>
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="clearBtn" data-nt-no-loader>
+                                        <i class="bi bi-eraser"></i> Clear All
+                                    </button>
+                                </div>
+
+                                <div class="mt-2 text-muted small">
+                                    Multi-select: <b>Ctrl+Click</b> • Move: drag • Delete key supported
+                                </div>
+
+                                @if (lockCore)
+                                {
+                                    <div class="alert alert-warning mt-2 mb-0 py-2 small">
+                                        <i class="bi bi-lock"></i>
+                                        Locked: Add/Delete/Move/Resize disabled. Only Seat Role/Active allowed.
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <i class="bi bi-sliders"></i> Properties
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <label class="form-label">Selected Type</label>
+                                    <input class="form-control form-control-sm" id="propType" readonly />
+                                </div>
+
+                                <div id="seatProps" style="display:none;">
+                                    <div class="mb-2">
+                                        <label class="form-label">Seat Code (Auto)</label>
+                                        <input class="form-control form-control-sm" id="seatCode" readonly />
+                                        <div class="form-text">Passenger: 1..N • Driver: D • Assistant: A</div>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        <label class="form-label">Role</label>
+                                        <select class="form-select form-select-sm" id="seatRole">
+                                            <option value="Passenger">Passenger</option>
+                                            <option value="Driver">Driver</option>
+                                            <option value="Assistant">Assistant</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="seatActive" checked>
+                                        <label class="form-check-label" for="seatActive">Active</label>
+                                    </div>
+                                </div>
+
+                                <div id="otherProps" style="display:none;">
+                                    <div class="mb-2">
+                                        <label class="form-label">Label</label>
+                                        <input class="form-control form-control-sm" id="otherLabel" placeholder="e.g. WC / Door" />
+                                    </div>
+                                </div>
+
+                                <div class="text-muted small" id="designerHint"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT -->
+                    <div class="col-lg-9">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-grid"></i> Bus Designer</span>
+                                <span class="badge bg-secondary" id="gridDimensions"></span>
+                            </div>
+                            <div class="card-body">
+                                <div class="designer-viewport">
+                                    <div class="bus-center-stage">
+                                        <div id="designerBusShell" class="bus-shell-portrait bus-shell-portrait--designer">
+                                            <div id="designerDoorLayer" class="door-layer"></div>
+                                            <div class="bus-interior">
+                                                <div id="grid" class="grid"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row mt-3 small g-2">
+                                    <div class="col-auto"><span class="legend legend-driver"></span> Driver (D)</div>
+                                    <div class="col-auto"><span class="legend legend-seat"></span> Active Seat</div>
+                                    <div class="col-auto"><span class="legend legend-inactive"></span> Inactive</div>
+                                    <div class="col-auto"><span class="legend legend-door"></span> Bus Door (Outside)</div>
+                                    <div class="col-auto"><span class="legend legend-wc"></span> WC</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="me-auto text-muted small" id="footerStatus"></div>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-nt-no-loader>Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveLayoutBtn" data-nt-no-loader>Save Layout</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <style nonce="@nonce">
+        .bus-preview-wrap {
+            background: linear-gradient(145deg, #f0f4f8 0%, #e6ecf3 100%);
+            border-radius: 24px;
+            padding: 18px 18px 16px;
+            border: 1px solid rgba(255,255,255,0.35);
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.8), 0 10px 22px rgba(0,0,0,0.10);
+        }
+
+        .preview-viewport {
+            max-height: 420px;
+            overflow: auto;
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(0,0,0,.08);
+            background: rgba(255,255,255,.55);
+        }
+
+        .designer-viewport {
+            min-height: 460px;
+            overflow: auto;
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(0,0,0,.08);
+            background: #fff;
+        }
+
+        .bus-center-stage {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 6px 0;
+        }
+
+        .bus-shell-portrait {
+            position: relative;
+            display: inline-block;
+            padding: 14px;
+            background: #fff;
+            border: 4px solid #2c3e50;
+            border-radius: 26px;
+            overflow: visible;
+        }
+
+            .bus-shell-portrait::before {
+                content: "";
+                position: absolute;
+                left: -2px;
+                right: -2px;
+                top: -22px;
+                height: 46px;
+                background: linear-gradient(180deg, rgba(44,62,80,.95), rgba(44,62,80,.70));
+                border: 4px solid #2c3e50;
+                border-bottom: none;
+                border-radius: 60px 60px 18px 18px;
+                box-shadow: 0 10px 18px rgba(0,0,0,.12);
+                pointer-events: none;
+            }
+
+        .bus-interior {
+            padding: 10px;
+            border-radius: 18px;
+            border: 2px dashed rgba(0,0,0,.20);
+            background: #fff;
+        }
+
+        .grid {
+            position: relative;
+            border-radius: 14px;
+            border: 2px solid rgba(0,0,0,.18);
+            background: #fff;
+            user-select: none;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        .door-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        .sel {
+            outline: 3px solid #ffc107;
+            outline-offset: 2px;
+        }
+
+        .info-pill {
+            margin-top: 14px;
+            padding: 12px 18px;
+            background: rgba(255,255,255,.90);
+            border-radius: 999px;
+            display: flex;
+            gap: 18px;
+            justify-content: center;
+            flex-wrap: wrap;
+            border: 1px solid rgba(0,0,0,.08);
+            box-shadow: 0 6px 14px rgba(0,0,0,.08);
+        }
+
+            .info-pill span {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: #2c3e50;
+                font-weight: 600;
+            }
+
+        .legend {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border-radius: 6px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .legend-driver {
+            background: rgba(13,110,253,.18);
+            border: 2px solid #0d6efd;
+        }
+
+        .legend-seat {
+            background: rgba(25,135,84,.18);
+            border: 2px solid #198754;
+        }
+
+        .legend-inactive {
+            background: rgba(220,53,69,.18);
+            border: 2px solid #dc3545;
+        }
+
+        .legend-wc {
+            background: rgba(108,117,125,.14);
+            border: 2px solid #6c757d;
+            border-radius: 50%;
+        }
+
+        .legend-door {
+            background: rgba(255,193,7,.22);
+            border: 2px solid #ff8f00;
+            border-radius: 4px;
+        }
+    </style>
+
+    <script nonce="@nonce">
+        (function () {
+            // ✅ flags from server
+            const IS_ARCHIVED = @((isArchived ? "true" : "false"));
+            const LOCK_CORE = @((lockCore ? "true" : "false"));
+            const LOCKED = (IS_ARCHIVED || LOCK_CORE);
+
+            const CELL = 44;
+            const PAD = 3;
+
+            const DOOR_THICK = 14;
+            const DOOR_LEN = 36;
+            const DOOR_GAP = 10;
+
+            const seatsJson = document.getElementById('seatsJson');
+
+            const modalEl = document.getElementById('seatDesignerModal');
+            const modalLayoutW = document.getElementById('modalLayoutW');
+            const modalLayoutH = document.getElementById('modalLayoutH');
+
+            const layoutWidthHidden = document.getElementById('layoutWidth');
+            const layoutHeightHidden = document.getElementById('layoutHeight');
+
+            const grid = document.getElementById('grid');
+            const designerDoorLayer = document.getElementById('designerDoorLayer');
+            const gridDimensions = document.getElementById('gridDimensions');
+
+            const previewGrid = document.getElementById('previewGrid');
+            const previewDoorLayer = document.getElementById('previewDoorLayer');
+            const previewDimensions = document.getElementById('previewDimensions');
+            const previewSeatCount = document.getElementById('previewSeatCount');
+            const previewDoorCount = document.getElementById('previewDoorCount');
+            const previewWcCount = document.getElementById('previewWcCount');
+
+            const deleteBtn = document.getElementById('deleteBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const saveLayoutBtn = document.getElementById('saveLayoutBtn');
+
+            const propType = document.getElementById('propType');
+            const seatProps = document.getElementById('seatProps');
+            const otherProps = document.getElementById('otherProps');
+            const seatCode = document.getElementById('seatCode');
+            const seatRole = document.getElementById('seatRole');
+            const seatActive = document.getElementById('seatActive');
+            const otherLabel = document.getElementById('otherLabel');
+            const hint = document.getElementById('designerHint');
+            const footerStatus = document.getElementById('footerStatus');
+
+            const seatsCountInput = document.getElementById('SeatsCount');
+            const tools = modalEl.querySelectorAll('[data-tool]');
+
+            let items = [];
+            let selectedIds = new Set();
+            let primarySelectedId = null;
+
+            function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+            function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+            function uid() { return (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + "_" + Math.random())); }
+
+            function getSize() {
+                const w = clamp(parseInt(modalLayoutW.value || (layoutWidthHidden.value || "3"), 10), 1, 30);
+                const h = clamp(parseInt(modalLayoutH.value || (layoutHeightHidden.value || "5"), 10), 1, 60);
+                return { w, h };
+            }
+
+            function syncHiddenLayout() {
+                const { w, h } = getSize();
+                layoutWidthHidden.value = w;
+                layoutHeightHidden.value = h;
+            }
+
+            function innerLayer(host) {
+                let inner = host.querySelector('[data-inner="1"]');
+                if (!inner) {
+                    inner = document.createElement('div');
+                    inner.setAttribute('data-inner', '1');
+                    inner.style.position = "absolute";
+                    inner.style.left = "0";
+                    inner.style.top = "0";
+                    host.appendChild(inner);
+                }
+                return inner;
+            }
+
+            function resizeGrid(hostGrid) {
+                const { w, h } = getSize();
+                const pxW = w * CELL;
+                const pxH = h * CELL;
+
+                hostGrid.style.width = pxW + "px";
+                hostGrid.style.height = pxH + "px";
+                hostGrid.style.backgroundSize = CELL + "px " + CELL + "px";
+                hostGrid.style.backgroundImage =
+                    "linear-gradient(to right, rgba(0,0,0,.07) 1px, transparent 1px), " +
+                    "linear-gradient(to bottom, rgba(0,0,0,.07) 1px, transparent 1px)";
+
+                const inner = innerLayer(hostGrid);
+                inner.style.width = pxW + "px";
+                inner.style.height = pxH + "px";
+
+                if (gridDimensions) gridDimensions.textContent = `${w} × ${h}`;
+                if (previewDimensions) previewDimensions.textContent = `${w}×${h}`;
+
+                items.forEach(it => {
+                    it.x = clamp(it.x ?? 0, 0, w - 1);
+                    it.y = clamp(it.y ?? 0, 0, h - 1);
+                });
+            }
+
+            function updateCounts() {
+                const passengerActive = items.filter(i =>
+                    i.type === "Seat" &&
+                    (i.role || "Passenger") === "Passenger" &&
+                    (i.isActive !== false)
+                ).length;
+
+                const doors = items.filter(i => i.type === "Door").length;
+                const wcs = items.filter(i => i.type === "WC").length;
+
+                if (previewSeatCount) previewSeatCount.textContent = String(passengerActive);
+                if (previewDoorCount) previewDoorCount.textContent = String(doors);
+                if (previewWcCount) previewWcCount.textContent = String(wcs);
+                if (seatsCountInput) seatsCountInput.value = passengerActive;
+            }
+
+            // ✅ Smooth Create-like renumber/resort (only when NOT locked)
+            function autoRenumber() {
+                if (LOCKED) { updateCounts(); return; }
+
+                const seats = items.filter(i => i.type === "Seat");
+
+                let driver = null;
+                let assistant = null;
+                const passengersActive = [];
+
+                for (const s of seats) {
+                    const role = (s.role || "Passenger");
+                    const active = (s.isActive !== false);
+
+                    if (role === "Driver" && !driver) driver = s;
+                    else if (role === "Assistant" && !assistant) assistant = s;
+                    else if (role === "Passenger" && active) passengersActive.push(s);
+                    else {
+                        // Passenger inactive => clear code (optional)
+                        if (role === "Passenger" && !active) s.code = "";
+                    }
+                }
+
+                passengersActive.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+                let n = 1;
+                passengersActive.forEach(p => p.code = String(n++));
+
+                if (driver) driver.code = "D";
+                if (assistant) assistant.code = "A";
+
+                updateCounts();
+            }
+
+            function clearSelection() {
+                selectedIds.clear();
+                primarySelectedId = null;
+                syncProps();
+            }
+
+            function selectOne(id) {
+                selectedIds.clear();
+                selectedIds.add(id);
+                primarySelectedId = id;
+                syncProps();
+            }
+
+            function toggleSelect(id) {
+                if (selectedIds.has(id)) selectedIds.delete(id);
+                else selectedIds.add(id);
+                primarySelectedId = id;
+                syncProps();
+            }
+
+            function syncProps() {
+                if (deleteBtn) deleteBtn.disabled = LOCKED || (selectedIds.size === 0);
+
+                const it = items.find(x => x.id === primarySelectedId);
+                if (!it) {
+                    if (propType) propType.value = "";
+                    if (seatProps) seatProps.style.display = "none";
+                    if (otherProps) otherProps.style.display = "none";
+                    if (seatCode) seatCode.value = "";
+                    if (seatRole) seatRole.value = "Passenger";
+                    if (seatActive) seatActive.checked = true;
+                    if (otherLabel) otherLabel.value = "";
+                    return;
+                }
+
+                if (propType) propType.value = it.type;
+
+                if (it.type === "Seat") {
+                    seatProps.style.display = "";
+                    otherProps.style.display = "none";
+                    seatCode.value = it.code || "";
+                    seatRole.value = it.role || "Passenger";
+                    seatActive.checked = (it.isActive !== false);
+
+                    // Archived => disable seat props
+                    if (IS_ARCHIVED) {
+                        seatRole.setAttribute("disabled", "disabled");
+                        seatActive.setAttribute("disabled", "disabled");
+                    } else {
+                        seatRole.removeAttribute("disabled");
+                        seatActive.removeAttribute("disabled");
+                    }
+                } else {
+                    seatProps.style.display = "none";
+                    otherProps.style.display = "";
+                    otherLabel.value = it.label || it.type;
+
+                    // Prevent editing non-seat labels in locked mode
+                    if (LOCKED) otherLabel.setAttribute("readonly", "readonly");
+                    else otherLabel.removeAttribute("readonly");
+                }
+            }
+
+            function getDropCellAndDoorSide(ev, hostGrid) {
+                const rect = hostGrid.getBoundingClientRect();
+                const x = ev.clientX - rect.left;
+                const y = ev.clientY - rect.top;
+
+                const { w, h } = getSize();
+                const cx = clamp(Math.floor(x / CELL), 0, w - 1);
+                const cy = clamp(Math.floor(y / CELL), 0, h - 1);
+
+                const inX = x - cx * CELL;
+                const inY = y - cy * CELL;
+
+                const edge = 0.28;
+                let side = "R";
+                if (inX <= CELL * edge) side = "L";
+                else if (inX >= CELL * (1 - edge)) side = "R";
+                else if (inY <= CELL * edge) side = "T";
+                else if (inY >= CELL * (1 - edge)) side = "B";
+
+                let offset = 0.5;
+                if (side === "L" || side === "R") offset = clamp(inY / CELL, 0, 1);
+                else offset = clamp(inX / CELL, 0, 1);
+
+                return { cx, cy, side, offset };
+            }
+
+            function addItem(type, x, y, extra) {
+                if (LOCKED) return;
+
+                const it = { id: uid(), type, x, y };
+
+                if (type === "Seat") {
+                    it.role = "Passenger";
+                    it.isActive = true;
+                    it.code = "";
+                }
+                if (type === "WC") it.label = "WC";
+                if (type === "Door") {
+                    it.label = "Bus Door";
+                    it.side = extra?.side || "R";
+                    it.offset = clamp01(extra?.offset ?? 0.5);
+                }
+
+                items.push(it);
+                autoRenumber();
+                selectOne(it.id);
+                renderAll();
+                if (footerStatus) footerStatus.textContent = "";
+            }
+
+            function deleteSelected() {
+                if (LOCKED) return;
+                if (selectedIds.size === 0) return;
+                items = items.filter(i => !selectedIds.has(i.id));
+                clearSelection();
+                autoRenumber();
+                renderAll();
+            }
+
+            function clearAll() {
+                if (LOCKED) return;
+                items = [];
+                clearSelection();
+                autoRenumber();
+                renderAll();
+            }
+
+            function renderGrid(hostGrid, hostDoorLayer, interactive) {
+                const inner = innerLayer(hostGrid);
+                inner.innerHTML = "";
+                hostDoorLayer.innerHTML = "";
+
+                const { w, h } = getSize();
+
+                items.forEach(it => {
+                    it.x = clamp(it.x, 0, w - 1);
+                    it.y = clamp(it.y, 0, h - 1);
+                });
+
+                const interior = items.filter(i => i.type !== "Door");
+
+                for (const it of interior) {
+                    const el = document.createElement('div');
+                    el.dataset.id = it.id;
+                    el.style.position = "absolute";
+
+                    const baseLeft = it.x * CELL + PAD;
+                    const baseTop = it.y * CELL + PAD;
+                    const baseW = CELL - PAD * 2;
+                    const baseH = CELL - PAD * 2;
+
+                    const isSel = selectedIds.has(it.id);
+
+                    if (it.type === "Seat") {
+                        el.style.left = baseLeft + "px";
+                        el.style.top = baseTop + "px";
+                        el.style.width = baseW + "px";
+                        el.style.height = baseH + "px";
+                        el.style.borderRadius = "10px";
+                        el.style.display = "flex";
+                        el.style.alignItems = "center";
+                        el.style.justifyContent = "center";
+                        el.style.fontWeight = "900";
+                        el.style.fontSize = "12px";
+                        el.style.boxShadow = "0 2px 6px rgba(0,0,0,.10)";
+                        el.style.zIndex = "4";
+                        el.textContent = it.code || "";
+
+                        const role = it.role || "Passenger";
+                        const active = (it.isActive !== false);
+
+                        if (!active) {
+                            el.style.background = "rgba(220,53,69,.12)";
+                            el.style.border = "2px solid #dc3545";
+                            el.style.color = "#dc3545";
+                        } else if (role === "Driver") {
+                            el.style.background = "rgba(13,110,253,.12)";
+                            el.style.border = "2px solid #0d6efd";
+                            el.style.color = "#0d6efd";
+                        } else if (role === "Assistant") {
+                            el.style.background = "rgba(111,66,193,.12)";
+                            el.style.border = "2px solid #6f42c1";
+                            el.style.color = "#6f42c1";
+                        } else {
+                            el.style.background = "rgba(25,135,84,.12)";
+                            el.style.border = "2px solid #198754";
+                            el.style.color = "#198754";
+                        }
+                    }
+                    else if (it.type === "WC") {
+                        el.style.left = baseLeft + "px";
+                        el.style.top = baseTop + "px";
+                        el.style.width = baseW + "px";
+                        el.style.height = baseH + "px";
+                        el.style.borderRadius = "50%";
+                        el.style.display = "flex";
+                        el.style.alignItems = "center";
+                        el.style.justifyContent = "center";
+                        el.style.fontWeight = "900";
+                        el.style.fontSize = "16px";
+                        el.style.background = "radial-gradient(circle at 30% 30%, #f8f9fa, #e9ecef)";
+                        el.style.border = "2px solid #6c757d";
+                        el.style.color = "#6c757d";
+                        el.style.zIndex = "5";
+                        el.textContent = "🚻";
+                    }
+
+                    if (interactive && isSel) el.classList.add("sel");
+
+                    if (interactive) {
+                        el.style.cursor = (LOCKED ? "pointer" : "grab");
+
+                        el.addEventListener("pointerdown", (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            const multi = e.ctrlKey;
+                            if (multi) toggleSelect(it.id);
+                            else {
+                                if (!selectedIds.has(it.id)) selectOne(it.id);
+                                else { primarySelectedId = it.id; syncProps(); }
+                            }
+                            renderAll();
+
+                            // ❌ move disabled in locked mode
+                            if (LOCKED) return;
+
+                            let startX = e.clientX;
+                            let startY = e.clientY;
+                            const startCellX = it.x;
+                            const startCellY = it.y;
+
+                            const onMove = (ev) => {
+                                const dx = Math.round((ev.clientX - startX) / CELL);
+                                const dy = Math.round((ev.clientY - startY) / CELL);
+                                const nx = clamp(startCellX + dx, 0, w - 1);
+                                const ny = clamp(startCellY + dy, 0, h - 1);
+                                it.x = nx; it.y = ny;
+                                autoRenumber();
+                                renderAll();
+                            };
+
+                            const onUp = () => {
+                                window.removeEventListener("pointermove", onMove);
+                                window.removeEventListener("pointerup", onUp);
+                            };
+
+                            window.addEventListener("pointermove", onMove);
+                            window.addEventListener("pointerup", onUp);
+                        });
+                    }
+
+                    inner.appendChild(el);
+                }
+
+                // Doors (outside) - selectable only when NOT locked
+                const doors = items.filter(i => i.type === "Door");
+                for (const d of doors) {
+                    const door = document.createElement("div");
+                    door.style.position = "absolute";
+
+                    const isVertical = (d.side === "L" || d.side === "R");
+                    door.style.width = isVertical ? (DOOR_THICK + "px") : (DOOR_LEN + "px");
+                    door.style.height = isVertical ? (DOOR_LEN + "px") : (DOOR_THICK + "px");
+
+                    door.style.borderRadius = "4px";
+                    door.style.background = "linear-gradient(90deg, rgba(255,193,7,.55), rgba(255,193,7,.18))";
+                    door.style.border = "2px solid #ff8f00";
+                    door.style.boxShadow = "0 4px 12px rgba(0,0,0,.18)";
+
+                    door.style.display = "flex";
+                    door.style.gap = "2px";
+                    door.style.padding = "2px";
+                    const p1 = document.createElement("div");
+                    const p2 = document.createElement("div");
+                    [p1, p2].forEach(p => {
+                        p.style.flex = "1";
+                        p.style.background = "rgba(255,255,255,.35)";
+                        p.style.border = "1px solid rgba(0,0,0,.12)";
+                        p.style.borderRadius = "2px";
+                    });
+                    door.appendChild(p1); door.appendChild(p2);
+
+                    const cellLeft = d.x * CELL;
+                    const cellTop = d.y * CELL;
+
+                    let x = 0, y = 0;
+                    const off = clamp01(d.offset ?? 0.5);
+
+                    if (d.side === "L") {
+                        x = cellLeft - DOOR_THICK - DOOR_GAP;
+                        y = cellTop + Math.round((CELL - DOOR_LEN) * off);
+                    } else if (d.side === "R") {
+                        x = cellLeft + CELL + DOOR_GAP;
+                        y = cellTop + Math.round((CELL - DOOR_LEN) * off);
+                    } else if (d.side === "T") {
+                        x = cellLeft + Math.round((CELL - DOOR_LEN) * off);
+                        y = cellTop - DOOR_THICK - DOOR_GAP;
+                    } else {
+                        x = cellLeft + Math.round((CELL - DOOR_LEN) * off);
+                        y = cellTop + CELL + DOOR_GAP;
+                    }
+
+                    const gridRect = hostGrid.getBoundingClientRect();
+                    const shellRect = hostDoorLayer.getBoundingClientRect();
+                    const offX = gridRect.left - shellRect.left;
+                    const offY = gridRect.top - shellRect.top;
+
+                    door.style.left = (offX + x) + "px";
+                    door.style.top = (offY + y) + "px";
+
+                    if (interactive && !LOCKED) {
+                        door.style.pointerEvents = "auto";
+                        door.style.cursor = "pointer";
+                        if (selectedIds.has(d.id)) door.classList.add("sel");
+
+                        door.addEventListener("pointerdown", (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const multi = e.ctrlKey;
+                            if (multi) toggleSelect(d.id);
+                            else selectOne(d.id);
+                            renderAll();
+                        });
+                    } else {
+                        door.style.pointerEvents = "none";
+                    }
+
+                    hostDoorLayer.appendChild(door);
+                }
+
+                if (hint) hint.textContent = items.length ? "" : "Drop tools into the bus to start.";
+            }
+
+            function renderAll() {
+                resizeGrid(grid);
+                renderGrid(grid, designerDoorLayer, true);
+
+                resizeGrid(previewGrid);
+                renderGrid(previewGrid, previewDoorLayer, false);
+
+                syncProps();
+                updateCounts();
+            }
+
+            function applyLockedUI() {
+                if (!LOCKED) return;
+
+                // Disable resize inputs
+                modalLayoutW.setAttribute("readonly", "readonly");
+                modalLayoutH.setAttribute("readonly", "readonly");
+                modalLayoutW.classList.add("bg-light");
+                modalLayoutH.classList.add("bg-light");
+
+                // Disable destructive buttons
+                if (deleteBtn) deleteBtn.disabled = true;
+                if (clearBtn) clearBtn.disabled = true;
+
+                // Disable toolbox
+                tools.forEach(t => {
+                    t.setAttribute("draggable", "false");
+                    t.classList.add("disabled");
+                    t.style.opacity = "0.55";
+                    t.style.cursor = "not-allowed";
+                });
+            }
+
+            // Toolbox drag
+            tools.forEach(t => {
+                t.addEventListener("dragstart", (e) => {
+                    if (LOCKED) { e.preventDefault(); return; }
+                    e.dataTransfer.setData("text/plain", t.getAttribute("data-tool"));
+                    try { e.dataTransfer.effectAllowed = "copy"; } catch { }
+                });
+            });
+
+            // Drop area
+            grid.addEventListener("dragover", (e) => {
+                if (LOCKED) return;
+                e.preventDefault();
+            });
+
+            grid.addEventListener("drop", (e) => {
+                if (LOCKED) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+                const type = (e.dataTransfer.getData("text/plain") || "").trim();
+                if (!type) return;
+
+                if (type === "Door") {
+                    const { cx, cy, side, offset } = getDropCellAndDoorSide(e, grid);
+                    addItem("Door", cx, cy, { side, offset });
+                } else {
+                    const rect = grid.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const { w, h } = getSize();
+                    const cx = clamp(Math.floor(x / CELL), 0, w - 1);
+                    const cy = clamp(Math.floor(y / CELL), 0, h - 1);
+                    addItem(type, cx, cy);
+                }
+            });
+
+            // Props changes (✅ allowed even in lockCore: seat role/active)
+            seatRole.addEventListener("change", () => {
+                if (IS_ARCHIVED) return;
+                const it = items.find(x => x.id === primarySelectedId);
+                if (!it || it.type !== "Seat") return;
+
+                it.role = seatRole.value;
+                autoRenumber();
+                renderAll();
+            });
+
+            seatActive.addEventListener("change", () => {
+                if (IS_ARCHIVED) return;
+                const it = items.find(x => x.id === primarySelectedId);
+                if (!it || it.type !== "Seat") return;
+
+                it.isActive = !!seatActive.checked;
+                autoRenumber();
+                renderAll();
+            });
+
+            otherLabel.addEventListener("input", () => {
+                if (LOCKED) return;
+                const it = items.find(x => x.id === primarySelectedId);
+                if (!it || it.type === "Seat") return;
+                it.label = (otherLabel.value || "").trim();
+            });
+
+            deleteBtn.addEventListener("click", deleteSelected);
+            clearBtn.addEventListener("click", clearAll);
+
+            document.addEventListener("keydown", (e) => {
+                if (e.key !== "Delete") return;
+                const m = bootstrap.Modal.getInstance(modalEl);
+                if (m && m._isShown) deleteSelected();
+            });
+
+            function validateBeforeSave() {
+                const seats = items.filter(i => i.type === "Seat");
+                if (seats.length === 0) { footerStatus.textContent = "Please add at least one Seat."; return false; }
+
+                const drivers = seats.filter(s => (s.role || "Passenger") === "Driver").length;
+                const assists = seats.filter(s => (s.role || "Passenger") === "Assistant").length;
+
+                if (drivers > 1) { footerStatus.textContent = "Only one Driver seat allowed."; return false; }
+                if (assists > 1) { footerStatus.textContent = "Only one Assistant seat allowed."; return false; }
+
+                footerStatus.textContent = "";
+                return true;
+            }
+
+            function saveToHidden() {
+                // In locked mode, do NOT change size
+                if (!LOCKED) syncHiddenLayout();
+
+                const payload = items.map(it => ({
+                    type: it.type,
+                    code: it.type === "Seat" ? (it.code || null) : null,
+                    x: it.x, y: it.y,
+                    isActive: it.type === "Seat" ? !!it.isActive : null,
+                    role: it.type === "Seat" ? (it.role || "Passenger") : null,
+                    label: it.type !== "Seat" ? (it.label || it.type) : null,
+                    side: it.type === "Door" ? (it.side || "R") : null,
+                    offset: it.type === "Door" ? (it.offset ?? 0.5) : null
+                }));
+
+                seatsJson.value = JSON.stringify(payload);
+                updateCounts();
+            }
+
+            function normalizeType(t) {
+                t = (t || "Seat").toString().trim().toLowerCase();
+                if (t === "seat") return "Seat";
+                if (t === "door") return "Door";
+                if (t === "wc") return "WC";
+                return "Seat";
+            }
+
+            function loadFromHidden() {
+                try {
+                    const arr = JSON.parse(seatsJson.value || "[]") || [];
+                    items = arr.map(s => {
+                        const type = normalizeType(s.type);
+                        const legacyCode = (s.seatCode || s.SeatCode || null);
+
+                        if (type === "Seat") {
+                            return {
+                                id: uid(),
+                                type: "Seat",
+                                x: s.x ?? s.X ?? 0,
+                                y: s.y ?? s.Y ?? 0,
+                                role: s.role ?? s.Role ?? "Passenger",
+                                isActive: (s.isActive ?? s.IsActive ?? true),
+                                code: (s.code ?? s.Code ?? legacyCode ?? "")
+                            };
+                        }
+
+                        if (type === "Door") {
+                            return {
+                                id: uid(),
+                                type: "Door",
+                                x: s.x ?? s.X ?? 0,
+                                y: s.y ?? s.Y ?? 0,
+                                label: s.label ?? s.Label ?? "Bus Door",
+                                side: (s.side ?? s.Side ?? "R"),
+                                offset: (s.offset ?? s.Offset ?? 0.5)
+                            };
+                        }
+
+                        if (type === "WC") {
+                            return {
+                                id: uid(),
+                                type: "WC",
+                                x: s.x ?? s.X ?? 0,
+                                y: s.y ?? s.Y ?? 0,
+                                label: s.label ?? s.Label ?? "WC"
+                            };
+                        }
+
+                        return {
+                            id: uid(),
+                            type: "Seat",
+                            x: s.x ?? s.X ?? 0,
+                            y: s.y ?? s.Y ?? 0,
+                            role: s.role ?? s.Role ?? "Passenger",
+                            isActive: (s.isActive ?? s.IsActive ?? true),
+                            code: (s.code ?? s.Code ?? legacyCode ?? "")
+                        };
+                    });
+
+                    // ✅ only renumber when not locked
+                    if (!LOCKED) autoRenumber();
+                    else updateCounts();
+                } catch {
+                    items = [];
+                    updateCounts();
+                }
+            }
+
+            saveLayoutBtn.addEventListener("click", () => {
+                if (IS_ARCHIVED) return;
+                if (!validateBeforeSave()) return;
+                saveToHidden();
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+                renderAll();
+            });
+
+            modalLayoutW.addEventListener("input", () => { if (!LOCKED) renderAll(); });
+            modalLayoutH.addEventListener("input", () => { if (!LOCKED) renderAll(); });
+
+            modalEl.addEventListener("shown.bs.modal", () => {
+                modalLayoutW.value = layoutWidthHidden.value || modalLayoutW.value;
+                modalLayoutH.value = layoutHeightHidden.value || modalLayoutH.value;
+
+                loadFromHidden();
+                renderAll();
+                applyLockedUI();
+            });
+
+            window.addEventListener("load", () => {
+                loadFromHidden();
+                renderAll();
+            });
+
+            const busForm = document.getElementById("busForm");
+            if (busForm) {
+                busForm.addEventListener("submit", (e) => {
+                    if (IS_ARCHIVED) { e.preventDefault(); return; }
+                    saveToHidden();
+                });
+            }
+        })();
+    </script>
+}

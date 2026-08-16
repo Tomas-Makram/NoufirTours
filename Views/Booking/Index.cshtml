@@ -1,0 +1,975 @@
+﻿@using NoufirTours.Data
+@using System.Text.Json
+@using System.Globalization
+@model NoufirTours.Models.Bookings.BookingIndexModel
+@{
+    ViewData["Title"] = "Search Trips";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    // =========================
+    // ✅ Shortcuts: 7 أيام (كل أيام الأسبوع) لكن "بتاريخ جديد" يبدأ من اليوم
+    // - لا يوجد أي تاريخ أقدم من اليوم
+    // - الترتيب: اليوم -> بكرة -> ... -> بعد 6 أيام
+    // - الـ Label نحاول نجيبه من Model.WeekShortcuts (لو موجود)، وإلا نستخدم أسماء عربية
+    // =========================
+    var today = DateTime.Today;
+
+    DateTime ParseIso(string? iso)
+    {
+        if (string.IsNullOrWhiteSpace(iso)) return today;
+        if (DateTime.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dt)) return dt.Date;
+        if (DateTime.TryParse(iso, out dt)) return dt.Date;
+        return today;
+    }
+
+    DateTime NextOccurrenceFromToday(DayOfWeek target)
+    {
+        // returns today..today+6 only
+        var diff = ((int)target - (int)today.DayOfWeek) % 7;
+        if (diff < 0) diff += 7;
+        return today.AddDays(diff).Date;
+    }
+
+    string DayNameAr(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Saturday => "السبت",
+        DayOfWeek.Sunday => "الأحد",
+        DayOfWeek.Monday => "الاثنين",
+        DayOfWeek.Tuesday => "الثلاثاء",
+        DayOfWeek.Wednesday => "الأربعاء",
+        DayOfWeek.Thursday => "الخميس",
+        DayOfWeek.Friday => "الجمعة",
+        _ => d.ToString()
+    };
+
+    // تاريخ البحث الحالي (لـ active chip)
+    var selectedIso = (Model.Date ?? "").Trim();
+    if (string.IsNullOrWhiteSpace(selectedIso))
+        selectedIso = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    // نعمل خريطة labels من WeekShortcuts حسب DayOfWeek (لو Model بيوفر Labels جاهزة)
+    var labelByDay = new Dictionary<DayOfWeek, string>();
+    if (Model.WeekShortcuts != null)
+    {
+        foreach (var s in Model.WeekShortcuts)
+        {
+            var d = ParseIso((string?)s.DateIso).DayOfWeek;
+            var lbl = (s.Label ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(lbl) && !labelByDay.ContainsKey(d))
+                labelByDay[d] = lbl;
+        }
+    }
+
+    // قائمة الأيام بالترتيب: اليوم ثم التالي... (7 أيام)
+    var weekOrdered = Enumerable.Range(0, 7)
+        .Select(i => today.AddDays(i).DayOfWeek)
+        .ToList();
+
+    // items جاهزة للرندر
+    var orderedShortcuts = weekOrdered.Select(dow =>
+    {
+        var dt = NextOccurrenceFromToday(dow); // اليوم..+6
+        var iso = dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var label = labelByDay.TryGetValue(dow, out var lbl) ? lbl : DayNameAr(dow);
+        var isActive = string.Equals(selectedIso, iso, StringComparison.OrdinalIgnoreCase);
+        return new { Label = label, DateIso = iso, IsActive = isActive };
+    }).ToList();
+}
+
+<style nonce="@nonce">
+    .search-hero {
+        border-radius: 18px;
+        padding: 18px;
+        background: linear-gradient(135deg, rgba(13,110,253,.10), rgba(25,135,84,.10));
+        border: 1px solid rgba(13,110,253,.12);
+    }
+
+    .day-chip {
+        border-radius: 999px;
+        padding: .35rem .75rem;
+        border: 1px solid rgba(0,0,0,.08);
+        background: #fff;
+        transition: .15s ease;
+        cursor: pointer;
+        user-select: none;
+        font-weight: 600;
+        font-size: .9rem;
+        white-space: nowrap;
+    }
+
+    [data-bs-theme="dark"] .day-chip {
+        background: #2b3035;
+        border-color: rgba(255,255,255,.1);
+        color: #e9ecef;
+    }
+
+    .day-chip:hover {
+        transform: translateY(-1px);
+    }
+
+    .day-chip.active {
+        background: rgba(13,110,253,.12);
+        border-color: rgba(13,110,253,.35);
+        color: #0d6efd;
+    }
+
+    [data-bs-theme="dark"] .day-chip.active {
+        background: rgba(13,110,253,.25);
+        color: #6ea8fe;
+    }
+
+    .results-card {
+        border-radius: 18px;
+        overflow: hidden;
+    }
+
+    .results-header {
+        background: #fff;
+        border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+
+    [data-bs-theme="dark"] .results-header {
+        background: #2b3035;
+        border-bottom-color: rgba(255,255,255,.1);
+    }
+
+    .empty-state {
+        padding: 26px;
+        text-align: center;
+    }
+
+    .btn-search-pro {
+        height: 38px;
+        border-radius: 14px;
+        border: 0;
+        padding: 0 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .45rem;
+        font-weight: 700;
+        letter-spacing: .2px;
+        color: #fff;
+        background: linear-gradient(135deg, #0d6efd, #20c997);
+        box-shadow: 0 10px 24px rgba(13,110,253,.18);
+        transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+        white-space: nowrap;
+    }
+
+        .btn-search-pro:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 30px rgba(13,110,253,.24);
+            filter: brightness(1.03);
+        }
+
+        .btn-search-pro:active {
+            transform: translateY(0px) scale(.99);
+            box-shadow: 0 8px 18px rgba(13,110,253,.20);
+        }
+
+        .btn-search-pro:focus {
+            outline: none;
+            box-shadow: 0 0 0 .22rem rgba(13,110,253,.20), 0 12px 26px rgba(13,110,253,.18);
+        }
+
+    .compact-control {
+        height: 34px !important;
+        padding-top: .25rem !important;
+        padding-bottom: .25rem !important;
+        font-size: .92rem !important;
+    }
+
+    .field-box {
+        border: 1px solid rgba(0,0,0,.08);
+        border-radius: 16px;
+        background: #fff;
+        padding: .6rem .65rem;
+    }
+
+    [data-bs-theme="dark"] .field-box {
+        background: #2b3035;
+        border-color: rgba(255,255,255,.1);
+    }
+
+    .field-box .box-title {
+        font-weight: 800;
+        font-size: .86rem;
+        color: rgba(0,0,0,.70);
+        margin-bottom: .45rem;
+        display: flex;
+        align-items: center;
+        gap: .4rem;
+    }
+
+    [data-bs-theme="dark"] .field-box .box-title {
+        color: rgba(255,255,255,.8);
+    }
+
+    .mini-label {
+        font-size: .78rem;
+        font-weight: 800;
+        color: rgba(0,0,0,.55);
+        margin-bottom: .25rem;
+    }
+
+    [data-bs-theme="dark"] .mini-label {
+        color: rgba(255,255,255,.6);
+    }
+
+    .stack-gap {
+        gap: .55rem;
+    }
+
+    #swapFromToBtn {
+        width: 34px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        #swapFromToBtn i {
+            line-height: 1;
+        }
+
+    .trip-select-table {
+        max-height: 400px;
+        overflow-y: auto;
+        border-radius: 16px;
+    }
+
+        .trip-select-table table {
+            margin-bottom: 0;
+        }
+
+        .trip-select-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+            .trip-select-table thead th {
+                background: #f8f9fa;
+                border-bottom: 2px solid rgba(0,0,0,.08);
+            }
+
+    [data-bs-theme="dark"] .trip-select-table thead th {
+        background: #343a40;
+        border-bottom-color: rgba(255,255,255,.1);
+    }
+
+    .trip-radio {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        accent-color: #0d6efd;
+    }
+
+    .round-booking-btn {
+        border-radius: 16px;
+        padding: 12px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #0d6efd, #20c997);
+        border: none;
+        color: white;
+        box-shadow: 0 8px 20px rgba(13,110,253,.2);
+        transition: .15s ease;
+    }
+
+        .round-booking-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(13,110,253,.3);
+        }
+
+        .round-booking-btn:active {
+            transform: translateY(0);
+        }
+
+    .trip-type-badge {
+        font-size: .75rem;
+        padding: .25rem .5rem;
+        border-radius: 999px;
+        background: rgba(13,110,253,.1);
+        color: #0d6efd;
+        font-weight: 600;
+    }
+
+    [data-bs-theme="dark"] .trip-type-badge {
+        background: rgba(13,110,253,.25);
+        color: #6ea8fe;
+    }
+</style>
+
+<div class="container py-4">
+
+    <div class="search-hero mb-3">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <div>
+                    <h3 class="mb-0">Search Trips</h3>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var d in orderedShortcuts)
+                    {
+                        <button type="button"
+                                class="day-chip @(d.IsActive ? "active" : "")"
+                                data-date="@d.DateIso"
+                                title="@d.DateIso">
+                            @d.Label
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+
+    <div class="card shadow-sm mb-3" style="border-radius:18px;">
+        <div class="card-body">
+            <form id="searchForm" method="get" class="row g-2 align-items-start">
+
+                <div class="col-md-2">
+                    <div class="field-box">
+                        <div class="box-title">
+                            <i class="bi bi-sliders"></i>
+                            Trip Options
+                        </div>
+
+                        <div class="mini-label">Trip Type</div>
+                        <select id="tripTypeSelect" class="form-select compact-control" name="type">
+                            <option value="Go" selected="@(Model.SelectedType == "Go" ? "selected" : null)">Go</option>
+                            <option value="Return" selected="@(Model.SelectedType == "Return" ? "selected" : null)">Return</option>
+                            <option value="Round" selected="@(Model.SelectedType == "Round" ? "selected" : null)">Round</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="field-box">
+                        <div class="box-title">
+                            <i class="bi bi-arrow-right"></i>
+                            Go
+                        </div>
+
+                        <div class="d-flex flex-column stack-gap">
+                            <div>
+                                <div class="mini-label">Date</div>
+                                <input id="dateInput" type="date" class="form-control compact-control" name="date" value="@Model.Date" />
+                            </div>
+
+                            <div>
+                                <div class="mini-label">Seats Count</div>
+                                <!-- ✅ مهم: ادينا ID عشان نقرأه في JS -->
+                                <input id="seatsInput"
+                                       type="number"
+                                       min="1"
+                                       class="form-control compact-control"
+                                       name="seats"
+                                       value="@(Model.SeatsCount?.ToString() ?? "1")"
+                                       placeholder="Min seats" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div id="returnBox" class="field-box" style="display:none;">
+                        <div class="box-title">
+                            <i class="bi bi-arrow-left"></i>
+                            Return
+                        </div>
+
+                        <div class="d-flex flex-column stack-gap">
+                            <div>
+                                <div class="mini-label">Return Date</div>
+                                <input id="returnDateInput" type="date" class="form-control compact-control" name="returnDate" value="@Model.ReturnDate" />
+                            </div>
+
+                            <div>
+                                <div class="mini-label">Return Seats</div>
+                                <input id="returnSeatsInput" type="number"
+                                       min="1"
+                                       class="form-control compact-control"
+                                       name="returnSeats"
+                                       value="@(Model.ReturnSeatsCount?.ToString() ?? "1")"
+                                       placeholder="Min seats" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="field-box">
+                        <div class="box-title">
+                            <i class="bi bi-geo-alt"></i>
+                            From
+                        </div>
+
+                        <div> @* class="d-flex align-items-center gap-2"> *@
+
+                            <select id="fromSelect" class="form-select compact-control" name="from">
+                                <option value="">-- None --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="field-box">
+                        <div class="box-title">
+                            <i class="bi bi-geo"></i>
+                            To
+                        </div>
+                        <select id="toSelect" class="form-select compact-control" name="to">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="col-12 d-flex justify-content-end">
+                    <button type="submit" class="btn-search-pro" title="Search">
+                        <span>Search</span>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm results-card">
+        <div class="card-header results-header d-flex justify-content-between align-items-center">
+            <div class="fw-semibold">Results</div>
+            <div class="text-muted small">
+                @if (Model.HasSearched)
+                {
+                    if (string.Equals(Model.SelectedType, "Round", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <span>GO: @Model.Results.Count | Return: @Model.ReturnResults.Count</span>
+                    }
+                    else
+                    {
+                        <span>Count: @Model.Results.Count</span>
+                    }
+                }
+                else
+                {
+                    <span>Choose a day to start</span>
+                }
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            @if (!Model.HasSearched)
+            {
+                <div class="empty-state">
+                    <div class="fw-semibold">No results yet</div>
+                    <div class="text-muted small">Select any weekday shortcut above, or pick a date then hit Search.</div>
+                </div>
+            }
+            else
+            {
+                var isRound = string.Equals(Model.SelectedType, "Round", StringComparison.OrdinalIgnoreCase);
+
+                @if (isRound)
+                {
+                    <div class="p-3">
+                        <div class="row g-3">
+                            <div class="col-lg-6">
+                                <div class="card results-card shadow-sm h-100">
+                                    <div class="card-header results-header d-flex justify-content-between align-items-center">
+                                        <span class="fw-semibold">
+                                            <i class="bi bi-arrow-right text-primary me-1"></i>
+                                            GO Trips
+                                        </span>
+                                        <span class="trip-type-badge">@Model.Results.Count available</span>
+                                    </div>
+
+                                    <div class="trip-select-table">
+                                        <table class="table table-sm mb-0 align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 40px;"></th>
+                                                    <th>Date/Time</th>
+                                                    <th>Route</th>
+                                                    <th class="text-end">Avail</th>
+                                                    <th class="text-end">Price</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @if (Model.Results.Count == 0)
+                                                {
+                                                    <tr>
+                                                        <td colspan="5" class="text-muted p-3 text-center">No GO trips found</td>
+                                                    </tr>
+                                                }
+                                                else
+                                                {
+                                                    foreach (var t in Model.Results)
+                                                    {
+                                                        <tr>
+                                                            <td class="text-center">
+                                                                <input type="radio" name="goPick" value="@t.TripId" class="trip-radio" />
+                                                            </td>
+                                                            <td class="text-nowrap">
+                                                                <div class="fw-semibold">@t.DepartDate</div>
+                                                                <div class="text-muted small">@t.DepartTime</div>
+                                                            </td>
+                                                            <td>
+                                                                <div class="fw-semibold">@t.FromCity → @t.ToCity</div>
+                                                            </td>
+                                                            <td class="text-end fw-semibold">@t.SeatsAvailable</td>
+                                                            <td class="text-end fw-semibold">@t.SeatPriceGo.ToString("0.##")</td>
+                                                        </tr>
+                                                    }
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="card results-card shadow-sm h-100">
+                                    <div class="card-header results-header d-flex justify-content-between align-items-center">
+                                        <span class="fw-semibold">
+                                            <i class="bi bi-arrow-left text-success me-1"></i>
+                                            RETURN Trips
+                                        </span>
+                                        <span class="trip-type-badge">@Model.ReturnResults.Count available</span>
+                                    </div>
+
+                                    <div class="trip-select-table">
+                                        <table class="table table-sm mb-0 align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 40px;"></th>
+                                                    <th>Date/Time</th>
+                                                    <th>Route</th>
+                                                    <th class="text-end">Avail</th>
+                                                    <th class="text-end">Price</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @if (Model.ReturnResults.Count == 0)
+                                                {
+                                                    <tr>
+                                                        <td colspan="5" class="text-muted p-3 text-center">No RETURN trips found</td>
+                                                    </tr>
+                                                }
+                                                else
+                                                {
+                                                    foreach (var t in Model.ReturnResults)
+                                                    {
+                                                        <tr>
+                                                            <td class="text-center">
+                                                                <input type="radio" name="retPick" value="@t.TripId" class="trip-radio" />
+                                                            </td>
+                                                            <td class="text-nowrap">
+                                                                <div class="fw-semibold">@t.DepartDate</div>
+                                                                <div class="text-muted small">@t.DepartTime</div>
+                                                            </td>
+                                                            <td>
+                                                                <div class="fw-semibold">@t.FromCity → @t.ToCity</div>
+                                                            </td>
+                                                            <td class="text-end fw-semibold">@t.SeatsAvailable</td>
+                                                            <td class="text-end fw-semibold">@t.SeatPriceReturn.ToString("0.##")</td>
+                                                        </tr>
+                                                    }
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <div class="col-12 mt-3">
+                                <form id="RoundPickForm" method="post" asp-action="Pick" asp-controller="Booking">
+                                    @Html.AntiForgeryToken()
+
+                                    <input type="hidden" name="tripId" id="RoundGoTripId" value="" />
+                                    <input type="hidden" name="type" value="Round" />
+                                    <input type="hidden" name="returnTripId" id="RoundReturnTripId" value="" />
+
+                                    <!-- ✅ مهم: دول هيتعبّوا من JS قبل الإرسال -->
+                                    <input type="hidden" name="seats" id="RoundSeats" value="@(Model.SeatsCount?.ToString() ?? "1")" />
+                                    <input type="hidden" name="returnSeats" id="RoundReturnSeats" value="@(Model.ReturnSeatsCount?.ToString() ?? "1")" />
+
+                                    <button class="round-booking-btn w-100" type="button" id="BookRoundBtn">
+                                        <i class="bi bi-check2-circle me-2"></i>
+                                        Book Round Trip (Select GO + RETURN)
+                                    </button>
+
+                                    <div class="text-muted small text-center mt-2">
+                                        Select one GO trip and one RETURN trip to book a round journey
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Trip</th>
+                                    <th>Date</th>
+                                    <th>Route</th>
+                                    <th class="text-end">Avail</th>
+                                    <th class="text-end">Price</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Results.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="7" class="text-muted p-3">No trips found for this date.</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    foreach (var t in Model.Results)
+                                    {
+                                        var price = Model.SelectedType == "Return" ? t.SeatPriceReturn : t.SeatPriceGo;
+
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">@t.TripName</div>
+                                            </td>
+                                            <td class="text-nowrap">
+                                                <div class="fw-semibold">@t.DepartDate</div>
+                                                <div class="text-muted small">@t.DepartTime</div>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold">@t.FromCity → @t.ToCity</div>
+                                            </td>
+                                            <td class="text-end fw-semibold">@t.SeatsAvailable</td>
+                                            <td class="text-end fw-semibold">@price.ToString("0.##")</td>
+
+                                            <td class="text-end">
+                                                <form method="post"
+                                                      asp-action="Pick"
+                                                      asp-controller="Booking"
+                                                      class="d-inline pick-form"
+                                                      data-pick="single">
+                                                    @Html.AntiForgeryToken()
+
+                                                    <input type="hidden" name="tripId" value="@t.TripId" />
+                                                    <input type="hidden" name="type" value="@Model.SelectedType" />
+
+                                                    <!-- ✅ مهم: سيبه فاضي واملاه من JS من textbox الحالي -->
+                                                    <input type="hidden" name="seats"
+                                                           value="@(Model.SeatsCount?.ToString() ?? "1")"
+                                                           class="pick-seats-hidden" />
+
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                        Book
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<script nonce="@nonce">
+    (function () {
+      // Helpers
+      function qs(sel, root) { return (root || document).querySelector(sel); }
+      function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+
+      function toInt(val, fallback) {
+        var n = parseInt((val || "").toString(), 10);
+        if (isNaN(n) || n < 1) return fallback || 1;
+        return n;
+      }
+
+      function getSeatsNow() {
+        var el = document.getElementById('seatsInput');
+        return toInt(el ? el.value : "1", 1);
+      }
+
+      function getReturnSeatsNow() {
+        var el = document.getElementById('returnSeatsInput');
+        return toInt(el ? el.value : "1", 1);
+      }
+
+      // ✅ ALWAYS keep all hidden inputs updated (single + round)
+      function syncSeatsToAllHidden() {
+        var seats = String(getSeatsNow());
+        var retSeats = String(getReturnSeatsNow());
+
+        // Single pick forms
+        qsa('input.pick-seats-hidden[name="seats"]').forEach(function (h) {
+          h.value = seats;
+        });
+
+        // Round form
+        var roundSeats = document.getElementById('RoundSeats');
+        var roundReturnSeats = document.getElementById('RoundReturnSeats');
+        if (roundSeats) roundSeats.value = seats;
+        if (roundReturnSeats) roundReturnSeats.value = retSeats;
+      }
+
+      // -----------------------------
+      // Day chips -> put date and submit
+      // -----------------------------
+      (function initDayChips() {
+        var chips = qsa('.day-chip[data-date]');
+        var dateInput = document.getElementById('dateInput');
+        var form = document.getElementById('searchForm');
+
+        chips.forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var iso = this.getAttribute('data-date');
+            if (!iso || !dateInput || !form) return;
+            dateInput.value = iso;
+            form.submit();
+          });
+        });
+      })();
+
+      // -----------------------------
+      // Trip type toggle (Round UI) + Swap Go<->Return
+      // -----------------------------
+      (function initTripTypeAndCities() {
+        var typeSelect = document.getElementById('tripTypeSelect');
+        var returnBox = document.getElementById('returnBox');
+        var returnDateInput = document.getElementById('returnDateInput');
+        var returnSeatsInput = document.getElementById('returnSeatsInput');
+
+        var fromSelect = document.getElementById('fromSelect');
+        var toSelect = document.getElementById('toSelect');
+        var swapBtn = document.getElementById('swapFromToBtn');
+
+        // provided by razor
+        var availableCities = @Html.Raw(JsonSerializer.Serialize(Model.AvailableCities ?? new List<string>()));
+        var currentFrom = '@(Model.FromCity ?? "")';
+        var currentTo   = '@(Model.ToCity ?? "")';
+
+        function setOptions(selectEl, selectedVal, excludeVal) {
+          if (!selectEl) return;
+          var keep = (selectedVal || "");
+          while (selectEl.options.length > 1) selectEl.remove(1);
+
+          (availableCities || []).forEach(function (city) {
+            if (excludeVal && city === excludeVal && city !== keep) return;
+            var opt = new Option(city, city);
+            if (keep && city === keep) opt.selected = true;
+            selectEl.add(opt);
+          });
+
+          if (keep) selectEl.value = keep;
+        }
+
+        function refreshSelects(desiredFrom, desiredTo) {
+          if (!fromSelect || !toSelect) return;
+
+          var fromVal = (typeof desiredFrom === 'string') ? desiredFrom : (fromSelect.value || '');
+          var toVal   = (typeof desiredTo === 'string') ? desiredTo : (toSelect.value || '');
+
+          setOptions(fromSelect, fromVal, toVal);
+          setOptions(toSelect, toVal, fromVal);
+
+          fromSelect.value = fromVal;
+          toSelect.value = toVal;
+        }
+
+        function initSelects() {
+          if (!fromSelect || !toSelect) return;
+          refreshSelects(currentFrom, currentTo);
+        }
+
+        function handleFromChange() {
+          if (!fromSelect || !toSelect) return;
+          if (fromSelect.value && fromSelect.value === toSelect.value) toSelect.value = '';
+          refreshSelects(fromSelect.value || '', toSelect.value || '');
+        }
+
+        function handleToChange() {
+          if (!fromSelect || !toSelect) return;
+          if (toSelect.value && toSelect.value === fromSelect.value) fromSelect.value = '';
+          refreshSelects(fromSelect.value || '', toSelect.value || '');
+        }
+
+        function swapFromTo() {
+          if (!fromSelect || !toSelect) return;
+          var a = fromSelect.value || '';
+          var b = toSelect.value || '';
+          refreshSelects(b, a);
+        }
+
+        function autoPickSingleRound() {
+          var isRound = ((typeSelect && typeSelect.value || "").toLowerCase() === "round");
+          if (!isRound) return;
+
+          var goRadios = qsa('input[name="goPick"]');
+          var retRadios = qsa('input[name="retPick"]');
+
+          if (goRadios.length === 1 && !goRadios[0].checked) goRadios[0].checked = true;
+          if (retRadios.length === 1 && !retRadios[0].checked) retRadios[0].checked = true;
+        }
+
+        // Swap on BOTH transitions (Return <-> Go)
+        var lastType = ((typeSelect && typeSelect.value) || "").toLowerCase();
+
+        function handleTypeRouteSwap(newType) {
+          if (!fromSelect || !toSelect) return;
+
+          if (newType === "return" && lastType !== "return") {
+            swapFromTo();
+          } else if (newType === "go" && lastType === "return") {
+            swapFromTo();
+          }
+        }
+
+        function syncRoundUI() {
+          var v = ((typeSelect && typeSelect.value) || "").toLowerCase();
+          var isRound = (v === "round");
+
+          if (returnBox) returnBox.style.display = isRound ? "" : "none";
+          if (returnDateInput) returnDateInput.required = isRound;
+          if (returnSeatsInput) returnSeatsInput.required = isRound;
+
+          handleTypeRouteSwap(v);
+
+          autoPickSingleRound();
+          syncSeatsToAllHidden();
+
+          lastType = v;
+        }
+
+        if (swapBtn) swapBtn.addEventListener('click', function () {
+          swapFromTo();
+        });
+
+        if (fromSelect && toSelect) {
+          initSelects();
+          fromSelect.addEventListener('change', handleFromChange);
+          toSelect.addEventListener('change', handleToChange);
+        }
+
+        if (typeSelect) typeSelect.addEventListener('change', syncRoundUI);
+        syncRoundUI();
+        autoPickSingleRound();
+      })();
+
+      // -----------------------------
+      // ✅ Keep seats hidden synced when user edits inputs
+      // -----------------------------
+      (function initSeatInputsSync() {
+        var seatsInput = document.getElementById('seatsInput');
+        var returnSeatsInput = document.getElementById('returnSeatsInput');
+
+        if (seatsInput) {
+          seatsInput.addEventListener('input', syncSeatsToAllHidden);
+          seatsInput.addEventListener('change', syncSeatsToAllHidden);
+          seatsInput.addEventListener('blur', syncSeatsToAllHidden);
+        }
+
+        if (returnSeatsInput) {
+          returnSeatsInput.addEventListener('input', syncSeatsToAllHidden);
+          returnSeatsInput.addEventListener('change', syncSeatsToAllHidden);
+          returnSeatsInput.addEventListener('blur', syncSeatsToAllHidden);
+        }
+      })();
+
+      // -----------------------------
+      // ✅ Robust: set seats just before ANY submit (works even لو النتائج اتغيرت)
+      // -----------------------------
+      document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form) return;
+
+        // only our booking forms
+        var isSinglePick = form.classList && form.classList.contains('pick-form') && form.getAttribute('data-pick') === 'single';
+        var isRoundPick = form.id === 'RoundPickForm';
+
+        if (!isSinglePick && !isRoundPick) return;
+
+        // ensure hidden values are correct right before submit
+        syncSeatsToAllHidden();
+
+        if (isSinglePick) {
+          var hidden = form.querySelector('input.pick-seats-hidden[name="seats"]');
+          if (hidden) hidden.value = String(getSeatsNow());
+        }
+
+        if (isRoundPick) {
+          var rs = document.getElementById('RoundSeats');
+          var rrs = document.getElementById('RoundReturnSeats');
+          if (rs) rs.value = String(getSeatsNow());
+          if (rrs) rrs.value = String(getReturnSeatsNow());
+        }
+      }, true); // capture = true (important)
+
+      // -----------------------------
+      // Round booking button -> fill hidden + submit POST
+      // -----------------------------
+      (function initRoundButton() {
+        var bookRoundBtn = document.getElementById('BookRoundBtn');
+        var roundGo = document.getElementById('RoundGoTripId');
+        var roundRet = document.getElementById('RoundReturnTripId');
+        var roundForm = document.getElementById('RoundPickForm');
+        var roundSeats = document.getElementById('RoundSeats');
+        var roundReturnSeats = document.getElementById('RoundReturnSeats');
+
+        if (!bookRoundBtn || !roundGo || !roundRet || !roundForm || !roundSeats || !roundReturnSeats) return;
+
+        function autoPickSingleRound() {
+          var typeSelect = document.getElementById('tripTypeSelect');
+          var isRound = ((typeSelect && typeSelect.value || "").toLowerCase() === "round");
+          if (!isRound) return;
+
+          var goRadios = qsa('input[name="goPick"]');
+          var retRadios = qsa('input[name="retPick"]');
+          if (goRadios.length === 1 && !goRadios[0].checked) goRadios[0].checked = true;
+          if (retRadios.length === 1 && !retRadios[0].checked) retRadios[0].checked = true;
+        }
+
+        bookRoundBtn.addEventListener('click', function () {
+          autoPickSingleRound();
+          syncSeatsToAllHidden();
+
+          var goRadio = qs('input[name="goPick"]:checked');
+          var retRadio = qs('input[name="retPick"]:checked');
+
+          var goTripId = goRadio && goRadio.value;
+          var retTripId = retRadio && retRadio.value;
+
+          if (!goTripId) { alert('Please select a GO trip'); return; }
+          if (!retTripId) { alert('Please select a RETURN trip'); return; }
+
+          roundGo.value = goTripId;
+          roundRet.value = retTripId;
+
+          // ✅ ALWAYS take current values (not defaults)
+          roundSeats.value = String(getSeatsNow());
+          roundReturnSeats.value = String(getReturnSeatsNow());
+
+          roundForm.submit();
+        });
+      })();
+
+      // Initial sync
+      syncSeatsToAllHidden();
+    })();
+</script>

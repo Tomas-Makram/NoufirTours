@@ -1,0 +1,824 @@
+﻿@using NoufirTours.Data
+@model NoufirTours.Models.Trips.Trips.TripCreateEditModel
+
+@{
+    ViewData["Title"] = "Edit Trip";
+
+    var nonce = Context.Items["CSPNonce"]?.ToString();
+
+    var selectedDate = (!string.IsNullOrWhiteSpace(Model?.DepartDate))
+        ? Model.DepartDate
+        : DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
+
+    // Default map center
+    var defaultLat = (Model?.PickupLat ?? 27.180824m);
+    var defaultLon = (Model?.PickupLon ?? 31.189725m);
+
+    var defaultPickupText = string.IsNullOrWhiteSpace(Model?.PickupPlace)
+        ? "First El-Helaly at Go Bus Company"
+        : Model!.PickupPlace;
+
+    // Locks rules (as agreed)
+    bool lockCore = Model?.HasAnyBookings == true;     // any booking => lock core fields
+    bool lockDateTime = true;                          // ALWAYS locked
+    bool lockBusDriver = Model?.HasAnyBookings == true;
+
+    // Allowed PriceTypes from controller
+    var allowedTypes = (ViewBag.AllowedPriceTypes as List<TripPriceType>)
+        ?? new List<TripPriceType> { TripPriceType.Go, TripPriceType.Return, TripPriceType.Round };
+
+    // If only one option => disable dropdown (but keep hidden input)
+    bool disableTypeSelect = (Model?.HasAnyBookings == true && allowedTypes.Count == 1);
+
+    bool canEditGoPrice = Model?.CanEditPriceGo == true;
+    bool canEditReturnPrice = Model?.CanEditPriceReturn == true;
+
+    // Helpers to print disabled/readonly safely with TagHelpers
+    string ReadOnlyAttr(bool ro) => ro ? "readonly" : "";
+}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="mb-0">@ViewData["Title"]</h3>
+            <small class="text-muted">
+                @if (Model?.HasAnyBookings == true)
+                {
+                    <span>Bookings exist: core fields are locked. You can only apply safe Type/Price edits.</span>
+                }
+                else
+                {
+                    <span>No bookings: you can edit everything except Date/Time.</span>
+                }
+            </small>
+        </div>
+        <a asp-action="Trips" class="btn btn-outline-secondary">
+            Back to List
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <form asp-action="EditTrip" method="post">
+                @Html.AntiForgeryToken()
+
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="IsArchivedInt" />
+
+                <!-- ✅ NAME + DATE + TIME -->
+                <div class="row mb-3 g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label asp-for="TripName" class="form-label fw-bold">Trip Name</label>
+                        <input asp-for="TripName"
+                               class="form-control"
+                               placeholder="Trip-1"
+                               readonly="@(lockCore)" />
+                        <span asp-validation-for="TripName" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Depart Date</label>
+                        <!-- ALWAYS readonly (visible) -->
+                        <input type="text" class="form-control" value="@selectedDate" readonly />
+                        <!-- keep binding -->
+                        <input type="hidden" asp-for="DepartDate" value="@selectedDate" />
+                        <span asp-validation-for="DepartDate" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Depart Time</label>
+                        <!-- ALWAYS readonly (visible) -->
+                        <input type="text" class="form-control" value="@(Model?.DepartTime ?? "")" readonly />
+                        <!-- keep binding -->
+                        <input type="hidden" asp-for="DepartTime" value="@(Model?.DepartTime ?? "")" />
+                        <span asp-validation-for="DepartTime" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <hr />
+
+                <!-- ✅ TRIP TYPE (PriceType) -->
+                <div class="mb-4">
+                    <label asp-for="PriceType" class="form-label fw-bold">Trip Type</label>
+
+                    <select asp-for="PriceType"
+                            class="form-select"
+                            disabled="@(disableTypeSelect)">
+                        @foreach (var t in allowedTypes)
+                        {
+                            <option value="@t">@t</option>
+                        }
+                    </select>
+
+                    @* إذا disabled لازم نحط hidden عشان القيمة تتبعت *@
+                    @if (disableTypeSelect)
+                    {
+                        <input type="hidden" asp-for="PriceType" />
+                    }
+
+                    <div class="form-text">
+                        @if (Model?.HasAnyBookings == true)
+                        {
+                            <span class="text-muted">Type change is restricted based on booked segments.</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Type can be changed freely (Date/Time still locked).</span>
+                        }
+                    </div>
+
+                    <span asp-validation-for="PriceType" class="text-danger"></span>
+                </div>
+
+                <!-- BUS -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Bus</label>
+
+                    <div class="input-group">
+                        <select asp-for="BusId"
+                                asp-items="ViewBag.AvailableBuses"
+                                class="form-select"
+                                id="busSelect"
+                                disabled="@(lockBusDriver)">
+                            <option value="">-- Select Bus --</option>
+                        </select>
+
+                        <button type="button" class="btn btn-outline-primary" id="busDetailsBtn">
+                            Details
+                        </button>
+                    </div>
+
+                    @if (lockBusDriver)
+                    {
+                        <input type="hidden" asp-for="BusId" />
+                        <div class="form-text text-muted">Locked because there are bookings.</div>
+                    }
+
+                    <span asp-validation-for="BusId" class="text-danger"></span>
+                    <div id="busSummary" class="small text-muted mt-2" style="display:none;"></div>
+                </div>
+
+                <!-- DRIVER -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Driver</label>
+
+                    <div class="input-group">
+                        <select asp-for="DriverId"
+                                asp-items="ViewBag.AvailableDrivers"
+                                class="form-select"
+                                id="driverSelect"
+                                disabled="@(lockBusDriver)">
+                            <option value="">-- Select Driver --</option>
+                        </select>
+
+                        <button type="button" class="btn btn-outline-success" id="driverDetailsBtn">
+                            Details
+                        </button>
+                    </div>
+
+                    @if (lockBusDriver)
+                    {
+                        <input type="hidden" asp-for="DriverId" />
+                        <div class="form-text text-muted">Locked because there are bookings.</div>
+                    }
+
+                    <span asp-validation-for="DriverId" class="text-danger"></span>
+                    <div id="driverSummary" class="small text-muted mt-2" style="display:none;"></div>
+                </div>
+
+                <!-- CITIES -->
+                <div class="row mb-3 g-3">
+                    <div class="col-md-6">
+                        <label asp-for="FromCity" class="form-label fw-bold">From City</label>
+                        <input asp-for="FromCity" class="form-control" readonly="@(lockCore)" />
+                        <span asp-validation-for="FromCity" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="ToCity" class="form-label fw-bold">To City</label>
+                        <input asp-for="ToCity" class="form-control" readonly="@(lockCore)" />
+                        <span asp-validation-for="ToCity" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <!-- ✅ Pickup (modal button) -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Pickup Location</label>
+
+                    <div class="border rounded p-3 pickup-shell">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold mb-1">Pickup Place (Text)</label>
+                                <input asp-for="PickupPlace"
+                                       class="form-control"
+                                       id="PickupPlace"
+                                       value="@defaultPickupText"
+                                       placeholder="Pickup place text"
+                                       readonly="@(lockCore)" />
+                                <span asp-validation-for="PickupPlace" class="text-danger"></span>
+
+                                <div class="form-text">
+                                    Coordinates will be selected from the popup.
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 text-md-end">
+                                <button type="button"
+                                        class="btn btn-primary w-100"
+                                        id="btnOpenLocationModal"
+                                        disabled="@(lockCore)">
+                                    <i class="bi bi-geo-alt me-1"></i> Use GPS / Choose Location
+                                </button>
+                                <div class="small text-muted mt-2" id="pickupMiniInfo"></div>
+                                @if (lockCore)
+                                {
+                                    <div class="small text-muted mt-1">Locked because there are bookings.</div>
+                                }
+                            </div>
+                        </div>
+
+                        <input type="hidden" asp-for="PickupLat" id="PickupLat" />
+                        <input type="hidden" asp-for="PickupLon" id="PickupLon" />
+
+                        <div class="mt-2">
+                            <span class="text-danger small" id="coordValidation" style="display:none;">
+                                Please select pickup location (Lat/Lon).
+                            </span>
+                            <span asp-validation-for="PickupLat" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PRICES -->
+                <div class="row mb-3 g-3">
+                    <div class="col-md-4">
+                        <label asp-for="SeatPriceGo" class="form-label fw-bold">Seat Price Go</label>
+                        <input asp-for="SeatPriceGo"
+                               type="number"
+                               class="form-control"
+                               step="0.01"
+                               readonly="@(canEditGoPrice ? (bool?)null : true)" />
+                        @if (!canEditGoPrice)
+                        {
+                            <div class="form-text text-muted">Locked because Go segment has bookings.</div>
+                        }
+                        <span asp-validation-for="SeatPriceGo" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label asp-for="SeatPriceReturn" class="form-label fw-bold">Seat Price Return</label>
+                        <input asp-for="SeatPriceReturn"
+                               type="number"
+                               class="form-control"
+                               step="0.01"
+                               readonly="@(canEditReturnPrice ? (bool?)null : true)" />
+                        @if (!canEditReturnPrice)
+                        {
+                            <div class="form-text text-muted">Locked because Return segment has bookings.</div>
+                        }
+                        <span asp-validation-for="SeatPriceReturn" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Notes" class="form-label fw-bold"></label>
+                    <textarea asp-for="Notes" class="form-control" rows="3" readonly="@(lockCore)"></textarea>
+                    <span asp-validation-for="Notes" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    Save Changes
+                </button>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- ========================= BUS MODAL ========================= -->
+<div class="modal fade" id="busModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Bus Details</h5>
+                    <small class="opacity-75">Full information about selected bus</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="busModalBody">Loading...</div>
+            <div class="modal-footer">
+                <a class="btn btn-warning me-auto" id="busEditLink" href="#" style="display:none;">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= DRIVER MODAL ========================= -->
+<div class="modal fade" id="driverModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Driver Details</h5>
+                    <small class="opacity-75">Full information about selected driver</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="driverModalBody">Loading...</div>
+            <div class="modal-footer">
+                <a class="btn btn-warning me-auto" id="driverEditLink" href="#" style="display:none;">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= LOCATION MODAL ========================= -->
+<div class="modal fade" id="locationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <div class="modal-header bg-dark text-white">
+                <div>
+                    <h5 class="modal-title mb-0"><i class="bi bi-geo-alt"></i> Choose Pickup Location</h5>
+                    <small class="opacity-75">Search, GPS, or click the map then Save</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="d-flex gap-2 flex-wrap mb-2">
+                                <button type="button" class="btn btn-primary" id="btnGpsInsideModal">
+                                    <i class="bi bi-crosshair2"></i> Use GPS
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="btnClearInsideModal">
+                                    <i class="bi bi-x-circle"></i> Clear
+                                </button>
+                            </div>
+
+                            <div class="small text-muted mb-3" id="locationModalStatus">
+                                Search place or click on map.
+                            </div>
+
+                            <label class="form-label fw-bold mb-1">Search Place</label>
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" id="txtPlaceSearchModal"
+                                       placeholder="Cairo, أسيوط, شارع..." autocomplete="off" />
+                                <button type="button" class="btn btn-outline-primary" id="btnPlaceSearchModal">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+
+                            <div class="form-text small mb-2" id="searchStatusModal">Type and press Search.</div>
+
+                            <div id="searchResultsWrapModal" style="display:none;">
+                                <div class="small fw-semibold mb-1">Results</div>
+                                <div class="list-group" id="searchResultsModal"></div>
+                            </div>
+
+                            <div class="alert alert-warning mt-2 py-2" id="searchErrorModal" style="display:none;">
+                                <div class="small" id="searchErrorTextModal"></div>
+                            </div>
+
+                            <hr />
+
+                            <label class="form-label fw-bold mb-1">Lat / Lon</label>
+                            <div class="row g-2">
+                                <div class="col-6"><input class="form-control" id="tmpLat" placeholder="Lat" /></div>
+                                <div class="col-6"><input class="form-control" id="tmpLng" placeholder="Lng" /></div>
+                            </div>
+
+                            <div class="small text-muted mt-2" id="tmpCoordsText"></div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-8">
+                        <div id="mapModal" class="map-box"></div>
+
+                        <div class="mt-2 p-2 rounded selected-box">
+                            <div class="small fw-semibold mb-1">Selected</div>
+                            <div class="small text-muted" id="selectedDetailsModal">No selection yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="btnSaveLocation">
+                    <i class="bi bi-check2-circle me-1"></i> Save Location
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script nonce="@nonce" src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <script nonce="@nonce">
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const busModal = new bootstrap.Modal(document.getElementById('busModal'));
+            const driverModal = new bootstrap.Modal(document.getElementById('driverModal'));
+            const locationModal = new bootstrap.Modal(document.getElementById('locationModal'));
+
+            const busSelect = document.getElementById("busSelect");
+            const driverSelect = document.getElementById("driverSelect");
+            const busSummary = document.getElementById("busSummary");
+            const driverSummary = document.getElementById("driverSummary");
+
+            async function fetchHtml(url) {
+                try {
+                    const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+                    if (!res.ok) return null;
+                    return await res.text();
+                } catch { return null; }
+            }
+
+            function optionText(selectEl) {
+                const opt = selectEl?.options?.[selectEl.selectedIndex];
+                return opt ? (opt.text || "") : "";
+            }
+
+            function refreshSummaries() {
+                if (busSelect?.value) {
+                    busSummary.innerHTML = `<b>Selected:</b> ${optionText(busSelect)}`;
+                    busSummary.style.display = "block";
+                }
+                if (driverSelect?.value) {
+                    driverSummary.innerHTML = `<b>Selected:</b> ${optionText(driverSelect)}`;
+                    driverSummary.style.display = "block";
+                }
+            }
+
+            busSelect?.addEventListener("change", refreshSummaries);
+            driverSelect?.addEventListener("change", refreshSummaries);
+            refreshSummaries();
+
+            document.getElementById("busDetailsBtn")?.addEventListener("click", async function () {
+                const id = busSelect?.value || "";
+                if (!id) return;
+
+                document.getElementById("busModalBody").innerHTML = "Loading...";
+                const html = await fetchHtml(`/Trips/BusDetailsModal?id=${encodeURIComponent(id)}`);
+                if (!html) { document.getElementById("busModalBody").innerHTML = "Failed to load."; return; }
+                document.getElementById("busModalBody").innerHTML = html;
+
+                const editLink = document.getElementById("busEditLink");
+                editLink.href = `/Trips/EditBus?id=${encodeURIComponent(id)}`;
+                editLink.style.display = "inline-block";
+
+                busModal.show();
+            });
+
+            document.getElementById("driverDetailsBtn")?.addEventListener("click", async function () {
+                const id = driverSelect?.value || "";
+                if (!id) return;
+
+                document.getElementById("driverModalBody").innerHTML = "Loading...";
+                const html = await fetchHtml(`/Trips/DriverDetailsModal?id=${encodeURIComponent(id)}`);
+                if (!html) { document.getElementById("driverModalBody").innerHTML = "Failed to load."; return; }
+                document.getElementById("driverModalBody").innerHTML = html;
+
+                const editLink = document.getElementById("driverEditLink");
+                editLink.href = `/Trips/EditDriver?id=${encodeURIComponent(id)}`;
+                editLink.style.display = "inline-block";
+
+                driverModal.show();
+            });
+
+            // =========================
+            // Location Modal (same as Create)
+            // =========================
+            const btnOpenLocationModal = document.getElementById('btnOpenLocationModal');
+            const pickupMiniInfo = document.getElementById('pickupMiniInfo');
+
+            const latInput = document.getElementById('PickupLat');
+            const lngInput = document.getElementById('PickupLon');
+            const coordValidation = document.getElementById('coordValidation');
+
+            const tmpLat = document.getElementById('tmpLat');
+            const tmpLng = document.getElementById('tmpLng');
+            const tmpCoordsText = document.getElementById('tmpCoordsText');
+            const selectedDetailsModal = document.getElementById('selectedDetailsModal');
+            const locationModalStatus = document.getElementById('locationModalStatus');
+
+            const txtPlaceSearchModal = document.getElementById('txtPlaceSearchModal');
+            const btnPlaceSearchModal = document.getElementById('btnPlaceSearchModal');
+            const searchStatusModal = document.getElementById('searchStatusModal');
+            const searchResultsWrapModal = document.getElementById('searchResultsWrapModal');
+            const searchResultsModal = document.getElementById('searchResultsModal');
+
+            const searchErrorModal = document.getElementById('searchErrorModal');
+            const searchErrorTextModal = document.getElementById('searchErrorTextModal');
+
+            const btnGpsInsideModal = document.getElementById('btnGpsInsideModal');
+            const btnClearInsideModal = document.getElementById('btnClearInsideModal');
+            const btnSaveLocation = document.getElementById('btnSaveLocation');
+
+            const defaultLat = @defaultLat.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            const defaultLng = @defaultLon.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            let map2 = null;
+            let marker2 = null;
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;')
+                    .replaceAll('"', '&quot;')
+                    .replaceAll("'", '&#039;');
+            }
+
+            function setUiErrorModal(msg) {
+                searchErrorTextModal.textContent = msg;
+                searchErrorModal.style.display = 'block';
+            }
+            function clearUiErrorModal() {
+                searchErrorModal.style.display = 'none';
+                searchErrorTextModal.textContent = '';
+            }
+
+            function setTmpLatLng(lat, lng, text) {
+                tmpLat.value = String(lat);
+                tmpLng.value = String(lng);
+                tmpCoordsText.textContent = `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+                if (text) selectedDetailsModal.textContent = text;
+                locationModalStatus.textContent = 'Location selected. Click Save.';
+            }
+
+            function initModalMapIfNeeded() {
+                if (map2) return;
+
+                map2 = L.map('mapModal', { zoomControl: true }).setView([defaultLat, defaultLng], 12);
+
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap &copy; CARTO'
+                }).addTo(map2);
+
+                marker2 = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map2);
+
+                map2.on('click', function (e) {
+                    clearUiErrorModal();
+                    marker2.setLatLng(e.latlng);
+                    setTmpLatLng(e.latlng.lat, e.latlng.lng, 'Selected by clicking the map.');
+                });
+
+                marker2.on('dragend', function () {
+                    clearUiErrorModal();
+                    const p = marker2.getLatLng();
+                    setTmpLatLng(p.lat, p.lng, 'Selected by dragging the pin.');
+                });
+            }
+
+            function syncModalFromMain() {
+                const curLat = parseFloat(latInput.value || '');
+                const curLng = parseFloat(lngInput.value || '');
+
+                if (!isNaN(curLat) && !isNaN(curLng)) {
+                    tmpLat.value = String(curLat);
+                    tmpLng.value = String(curLng);
+                    tmpCoordsText.textContent = `Lat: ${curLat.toFixed(6)} , Lng: ${curLng.toFixed(6)}`;
+                    selectedDetailsModal.textContent = 'Current saved pickup location.';
+                    locationModalStatus.textContent = 'You can adjust then Save.';
+
+                    if (map2 && marker2) {
+                        marker2.setLatLng([curLat, curLng]);
+                        map2.setView([curLat, curLng], 14);
+                    }
+                } else {
+                    tmpLat.value = String(defaultLat);
+                    tmpLng.value = String(defaultLng);
+                    tmpCoordsText.textContent = `Lat: ${defaultLat.toFixed(6)} , Lng: ${defaultLng.toFixed(6)}`;
+                    selectedDetailsModal.textContent = 'Default location loaded.';
+                }
+            }
+
+            btnOpenLocationModal?.addEventListener('click', function () {
+                // if disabled, do nothing
+                if (btnOpenLocationModal && btnOpenLocationModal.disabled) return;
+
+                locationModal.show();
+
+                setTimeout(() => {
+                    initModalMapIfNeeded();
+                    map2.invalidateSize();
+
+                    syncModalFromMain();
+
+                    const lat = parseFloat(tmpLat.value);
+                    const lng = parseFloat(tmpLng.value);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        marker2.setLatLng([lat, lng]);
+                        map2.setView([lat, lng], 14);
+                    }
+                }, 250);
+            });
+
+            btnGpsInsideModal?.addEventListener('click', function () {
+                clearUiErrorModal();
+
+                if (!navigator.geolocation) {
+                    locationModalStatus.textContent = 'GPS is not supported. Use search or click the map.';
+                    return;
+                }
+
+                btnGpsInsideModal.disabled = true;
+                locationModalStatus.textContent = 'Detecting GPS...';
+
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        try {
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
+
+                            marker2.setLatLng([lat, lng]);
+                            map2.setView([lat, lng], 17);
+                            setTmpLatLng(lat, lng, 'Selected by GPS.');
+                        } finally {
+                            btnGpsInsideModal.disabled = false;
+                        }
+                    },
+                    () => {
+                        btnGpsInsideModal.disabled = false;
+                        locationModalStatus.textContent = 'Could not use GPS. Use search or click the map.';
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+            });
+
+            btnClearInsideModal?.addEventListener('click', function () {
+                clearUiErrorModal();
+                tmpLat.value = '';
+                tmpLng.value = '';
+                tmpCoordsText.textContent = '';
+                selectedDetailsModal.textContent = 'No selection yet.';
+                locationModalStatus.textContent = 'Cleared. Search or click map.';
+                searchResultsWrapModal.style.display = 'none';
+            });
+
+            async function doSearchModal(query) {
+                clearUiErrorModal();
+
+                const q = (query || '').trim();
+                if (!q) {
+                    searchStatusModal.textContent = 'Type a place name then click Search.';
+                    searchResultsWrapModal.style.display = 'none';
+                    return;
+                }
+
+                searchStatusModal.textContent = 'Searching...';
+                btnPlaceSearchModal.disabled = true;
+                searchResultsWrapModal.style.display = 'none';
+                searchResultsModal.innerHTML = '';
+
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`;
+                    const res = await fetch(url, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json', 'Accept-Language': 'ar,en' }
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                    const data = await res.json();
+                    if (!Array.isArray(data) || data.length === 0) {
+                        searchStatusModal.textContent = 'No results. Try adding city/governorate.';
+                        return;
+                    }
+
+                    searchStatusModal.textContent = `Found ${data.length} results. Click one.`;
+                    searchResultsWrapModal.style.display = 'block';
+
+                    for (const item of data) {
+                        const lat = parseFloat(item.lat);
+                        const lng = parseFloat(item.lon);
+                        const display = item.display_name || 'Unknown';
+
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'list-group-item list-group-item-action';
+                        btn.innerHTML = `
+                            <div class="fw-semibold small">${escapeHtml(display)}</div>
+                            <div class="text-muted small">Lat: ${lat.toFixed(5)} , Lng: ${lng.toFixed(5)}</div>
+                        `;
+                        btn.addEventListener('click', function () {
+                            marker2.setLatLng([lat, lng]);
+                            map2.setView([lat, lng], 16);
+                            setTmpLatLng(lat, lng, display);
+                            searchResultsWrapModal.style.display = 'none';
+                        });
+
+                        searchResultsModal.appendChild(btn);
+                    }
+                }
+                catch (err) {
+                    searchStatusModal.textContent = 'Search failed.';
+                    setUiErrorModal('Search blocked (CORS/CSP) or rate-limited. Allow connect-src for nominatim or route via backend.');
+                }
+                finally {
+                    btnPlaceSearchModal.disabled = false;
+                }
+            }
+
+            btnPlaceSearchModal?.addEventListener('click', () => doSearchModal(txtPlaceSearchModal.value));
+            txtPlaceSearchModal?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); doSearchModal(txtPlaceSearchModal.value); }
+            });
+
+            btnSaveLocation?.addEventListener('click', function () {
+                const lat = parseFloat(tmpLat.value || '');
+                const lng = parseFloat(tmpLng.value || '');
+
+                if (isNaN(lat) || isNaN(lng)) {
+                    locationModalStatus.textContent = 'Please select valid Lat/Lon first.';
+                    return;
+                }
+
+                latInput.value = String(lat);
+                lngInput.value = String(lng);
+
+                coordValidation.style.display = 'none';
+                pickupMiniInfo.textContent = `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+
+                locationModal.hide();
+            });
+
+            if (latInput.value && lngInput.value) {
+                const lat = parseFloat(latInput.value);
+                const lng = parseFloat(lngInput.value);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    pickupMiniInfo.textContent = `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+                }
+            }
+
+            const form = document.querySelector('form');
+            form.addEventListener('submit', function (e) {
+                const lat = (latInput.value || '').trim();
+                const lng = (lngInput.value || '').trim();
+
+                // only enforce when pickup editing is allowed
+                if (!@((lockCore).ToString().ToLowerInvariant())) {
+                    if (!lat || !lng) {
+                        e.preventDefault();
+                        coordValidation.style.display = 'inline';
+                        document.getElementById('btnOpenLocationModal')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            });
+
+        });
+    </script>
+
+    <style nonce="@nonce">
+        .map-box {
+            height: 520px;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid rgba(15,23,42,.10);
+            background: #fff;
+        }
+
+        .selected-box {
+            background: rgba(248,250,252,.85);
+            border: 1px solid rgba(15,23,42,.08);
+        }
+
+        .pickup-shell {
+            background: rgba(255,255,255,.80);
+        }
+
+        /* Dark mode */
+        [data-bs-theme="dark"] .map-box {
+            border-color: rgba(255,255,255,.14);
+            background: #1b1f24;
+        }
+
+        [data-bs-theme="dark"] .selected-box {
+            background: rgba(33,37,41,.75);
+            border-color: rgba(255,255,255,.12);
+        }
+
+        [data-bs-theme="dark"] .pickup-shell {
+            background: rgba(33,37,41,.65);
+            border-color: rgba(255,255,255,.10);
+        }
+    </style>
+}

@@ -1,0 +1,13 @@
+.env
+node_modules/
+*.log
+.idea/
+.vscode/
+appsettings.json
+appsettings.Development.json
+appsettings.Production.json
+bin/
+obj/
+*.user
+*.suo
+.vs/

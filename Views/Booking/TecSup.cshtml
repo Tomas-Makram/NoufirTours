@@ -1,0 +1,157 @@
+﻿@using System.Globalization
+@model NoufirTours.Data.TechnicalSupport
+@{
+    ViewData["Title"] = "Technical Support";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    string Safe(string? s) => string.IsNullOrWhiteSpace(s) ? "—" : s.Trim();
+
+    string UpdatedText()
+    {
+        try
+        {
+            if (Model == null || Model.UpdatedAtUnix <= 0) return "—";
+            return DateTimeOffset.FromUnixTimeSeconds(Model.UpdatedAtUnix)
+                .ToLocalTime()
+                .ToString("yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture);
+        }
+        catch { return "—"; }
+    }
+}
+
+<style nonce="@nonce">
+    :root {
+        --ts-bg: #f6f8fc;
+        --ts-card: #ffffff;
+        --ts-text: #0f172a;
+        --ts-muted: #64748b;
+        --ts-border: rgba(15,23,42,.14);
+        --ts-shadow: rgba(2,6,23,.16);
+    }
+
+    @@media (prefers-color-scheme: dark) {
+        html:not([data-bs-theme="light"]):not([data-bs-theme="dark"]) {
+            --ts-bg: #0b1020;
+            --ts-card: #111a2f;
+            --ts-text: #e5e7eb;
+            --ts-muted: #94a3b8;
+            --ts-border: rgba(148,163,184,.20);
+            --ts-shadow: rgba(0,0,0,.45);
+        }
+    }
+
+    [data-bs-theme="dark"] {
+        --ts-bg: #0b1020;
+        --ts-card: #111a2f;
+        --ts-text: #e5e7eb;
+        --ts-muted: #94a3b8;
+        --ts-border: rgba(148,163,184,.20);
+        --ts-shadow: rgba(0,0,0,.45);
+    }
+
+    body {
+        background: var(--ts-bg) !important;
+        color: var(--ts-text) !important;
+    }
+
+    .ts-card {
+        background: var(--ts-card) !important;
+        color: var(--ts-text) !important;
+        border: 1px solid var(--ts-border) !important;
+        border-radius: 16px;
+        box-shadow: 0 .6rem 1.5rem var(--ts-shadow);
+    }
+
+    .ts-k {
+        color: var(--ts-muted);
+        font-size: .85rem;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+    }
+
+    .ts-v {
+        font-weight: 800;
+        font-size: 1.1rem;
+    }
+</style>
+
+<!-- ✅ Fallback UI (لو Bootstrap JS مش موجود، دي هتظهر بدل الصفحة الفاضية) -->
+<div class="container py-4" id="fallbackCard" style="display:none;">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-7 col-lg-5">
+            <div class="ts-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">Technical Support</h5>
+                    <a class="btn btn-outline-secondary btn-sm" href="@Url.Action("Index", "Booking")">Close</a>
+                </div>
+
+                <div class="mb-3">
+                    <div class="ts-k">Company Phone</div>
+                    <div class="ts-v">@Safe(Model?.CompanyPhone)</div>
+                </div>
+
+                <div class="mb-2">
+                    <div class="ts-k">Complaints Phone</div>
+                    <div class="ts-v">@Safe(Model?.ComplaintsPhone)</div>
+                </div>
+
+                <div class="text-muted small mt-3">Last update: @UpdatedText()</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ Modal -->
+<div class="modal fade" id="techSupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content ts-card">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Technical Support</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body pt-0">
+                <div class="mb-3">
+                    <div class="ts-k">Company Phone</div>
+                    <div class="ts-v">@Safe(Model?.CompanyPhone)</div>
+                </div>
+
+                <div>
+                    <div class="ts-k">Complaints Phone</div>
+                    <div class="ts-v">@Safe(Model?.ComplaintsPhone)</div>
+                </div>
+
+                <div class="text-muted small mt-3">Last update: @UpdatedText()</div>
+            </div>
+
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="@nonce">
+    (function () {
+        const modalEl = document.getElementById('techSupModal');
+        const fallback = document.getElementById('fallbackCard');
+        const backUrl = '@Url.Action("Index", "Booking")';
+
+        // لو Bootstrap JS مش موجود -> اعرض fallback card
+        if (!modalEl || !window.bootstrap || !bootstrap.Modal) {
+            if (fallback) fallback.style.display = '';
+            return;
+        }
+
+        // Bootstrap موجود -> اعرض مودال
+        const modal = new bootstrap.Modal(modalEl, { backdrop: true, keyboard: true });
+        modal.show();
+
+        // عند الإغلاق ارجع للـ Index
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            window.location.href = backUrl;
+        });
+    })();
+</script>

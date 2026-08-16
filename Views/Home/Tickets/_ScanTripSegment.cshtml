@@ -1,0 +1,507 @@
+﻿@using System.Globalization
+@using NoufirTours.Data
+@model NoufirTours.Models.Home.TicketTripSegmentModel
+
+@{
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    string V(string? x) => string.IsNullOrWhiteSpace(x) ? "-" : x.Trim();
+    string Money(decimal v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    const int CELL = 44;
+    const int PAD = 3;
+
+    const int DOOR_THICK = 14;
+    const int DOOR_LEN = 36;
+    const int DOOR_GAP = 10;
+
+    var trip = Model?.Trip;
+    var bus = Model?.Bus;
+    var driver = Model?.Driver;
+
+    var items = bus?.Seats ?? new List<BusSeat>();
+
+    bool IsBooked(string? code)
+        => !string.IsNullOrWhiteSpace(code) && Model.BookedSeats.Contains(code.Trim());
+
+    string SeatBg(string? role, bool isActive, bool booked)
+    {
+        if (booked) return "rgba(255,193,7,.40)";
+        if (!isActive) return "rgba(220,53,69,.12)";
+        role ??= "Passenger";
+        if (role == "Driver") return "rgba(13,110,253,.12)";
+        if (role == "Assistant") return "rgba(111,66,193,.12)";
+        return "rgba(25,135,84,.12)";
+    }
+
+    string SeatBorder(string? role, bool isActive, bool booked)
+    {
+        if (booked) return "#ffb300";
+        if (!isActive) return "#dc3545";
+        role ??= "Passenger";
+        if (role == "Driver") return "#0d6efd";
+        if (role == "Assistant") return "#6f42c1";
+        return "#198754";
+    }
+
+    int layoutW = (bus?.LayoutWidth ?? 0);
+    int layoutH = (bus?.LayoutHeight ?? 0);
+
+    var doors = items.Where(i => (i.ElementType ?? "").Equals("Door", StringComparison.OrdinalIgnoreCase)).ToList();
+
+    var cellGroups = items
+        .Where(i => !(i.ElementType ?? "").Equals("Door", StringComparison.OrdinalIgnoreCase))
+        .GroupBy(i => new { i.X, i.Y })
+        .OrderBy(g => g.Key.Y).ThenBy(g => g.Key.X)
+        .ToList();
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="fw-semibold">
+            <i class="bi bi-flag me-1"></i> @Model.Title Segment
+        </div>
+
+        <!-- LEGEND واحدة فقط -->
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <div>
+                @if (Model.IsArchived)
+                {
+                    <span class="badge text-bg-danger">
+                        <i class="bi bi-archive me-1"></i> Archived (@Model.ArchiveReason)
+                    </span>
+                }
+                else
+                {
+                    <span class="badge text-bg-success">
+                        <i class="bi bi-clock me-1"></i> Active
+                    </span>
+                }
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="badge" style="background: rgba(255,193,7,.25); border: 1px solid #ffb300; color: #8a5a00;">Booked</span>
+                <span class="badge" style="background: rgba(25,135,84,.14); border: 1px solid #198754; color: #198754;">Passenger</span>
+                <span class="badge" style="background: rgba(13,110,253,.14); border: 1px solid #0d6efd; color: #0d6efd;">Driver</span>
+                <span class="badge" style="background: rgba(111,66,193,.14); border: 1px solid #6f42c1; color: #6f42c1;">Assistant</span>
+                <span class="badge" style="background: rgba(220,53,69,.12); border: 1px solid #dc3545; color: #dc3545;">Inactive</span>
+                <span class="badge" style="background: rgba(255,193,7,.22); border: 1px solid #ff8f00; color: #8a5a00;">Door</span>
+                <span class="badge" style="background: rgba(108,117,125,.14); border: 1px solid #6c757d; color: #6c757d;">WC</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        @if (trip == null)
+        {
+            <div class="text-muted">Trip not found.</div>
+        }
+        else
+        {
+            <div class="row g-3">
+                <!-- LEFT: Trip + Booking seats + Bus Features + Driver -->
+                <div class="col-lg-5">
+                    <div class="info-card">
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <div class="text-muted small">Trip</div>
+                                <div class="fw-semibold">@V(trip.TripName)</div>
+                            </div>
+
+                            <div class="col-6">
+                                <div class="text-muted small">Depart Date</div>
+                                <div class="fw-semibold">@V(trip.DepartDate)</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">Depart Time</div>
+                                <div class="fw-semibold">@V(trip.DepartTime)</div>
+                            </div>
+
+                            <div class="col-6">
+                                <div class="text-muted small">From</div>
+                                <div class="fw-semibold">@V(trip.FromCity)</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">To</div>
+                                <div class="fw-semibold">@V(trip.ToCity)</div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="text-muted small">Pickup</div>
+                                <div class="fw-semibold">@V(trip.PickupPlace)</div>
+                            </div>
+                            <div class="col-12">
+                                <div class="text-muted small">Dropoff</div>
+                                <div class="fw-semibold">@V(Model.DestinationPlaceName)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="text-muted small mb-1">Booked seats</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            @if (Model.BookedSeats == null || Model.BookedSeats.Count == 0)
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                            else
+                            {
+                                @foreach (var s in Model.BookedSeats.OrderBy(x => x))
+                                {
+                                    <span class="badge rounded-pill booked-pill">@s</span>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="text-muted small mb-1">Bus Features</div>
+                        <div class="info-card">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="text-muted small">Bus Number</div>
+                                    <div class="fw-semibold">@V(bus?.BusNumber)</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-muted small">Plate</div>
+                                    <div class="fw-semibold">@V(bus?.PlateNumber)</div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="text-muted small">Specs</div>
+                                    <div class="fw-semibold" style="white-space:pre-wrap">@V(bus?.Specs)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="text-muted small mb-1">Driver</div>
+                        @if (driver == null)
+                        {
+                            <div class="text-muted">No driver linked.</div>
+                        }
+                        else
+                        {
+                            <div class="info-card">
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <div class="text-muted small">Name</div>
+                                        <div class="fw-semibold">@V(driver.FullName)</div>
+                                    </div>
+
+                                    <div class="col-12 mt-2">
+                                        <div class="text-muted small mb-1">Phones</div>
+                                        @if (driver.Phones == null || !driver.Phones.Any())
+                                        {
+                                            <div class="text-muted">-</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex flex-wrap gap-2">
+                                                @foreach (var p in driver.Phones.OrderByDescending(x => x.IsPrimaryInt).ThenBy(x => x.PhoneNumber))
+                                                {
+                                                    <span class="badge rounded-pill @(p.IsPrimary ? "text-bg-primary" : "text-bg-secondary")">@V(p.PhoneNumber)</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- RIGHT: Bus Layout -->
+                <div class="col-lg-7">
+                    @if (bus == null)
+                    {
+                        <div class="text-muted">No bus linked.</div>
+                    }
+                    else if (layoutW <= 0 || layoutH <= 0)
+                    {
+                        <div class="text-muted">Bus layout size not set.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex justify-content-center">
+                            <div class="bus-shell-portrait">
+                                <div class="bus-interior">
+                                    <div class="grid-wrap">
+                                        <!-- Doors -->
+                                        <div class="door-layer">
+                                            @foreach (var d in doors)
+                                            {
+                                                var side = (d.DoorSide ?? "R").ToUpperInvariant();
+                                                var offset = d.DoorOffset ?? 0.5;
+
+                                                var cellLeft = d.X * CELL;
+                                                var cellTop = d.Y * CELL;
+
+                                                int pxLeft, pxTop;
+
+                                                if (side == "L")
+                                                {
+                                                    pxLeft = cellLeft - DOOR_THICK - DOOR_GAP;
+                                                    pxTop = cellTop + (int)Math.Round((CELL - DOOR_LEN) * offset);
+                                                }
+                                                else if (side == "R")
+                                                {
+                                                    pxLeft = cellLeft + CELL + DOOR_GAP;
+                                                    pxTop = cellTop + (int)Math.Round((CELL - DOOR_LEN) * offset);
+                                                }
+                                                else if (side == "T")
+                                                {
+                                                    pxLeft = cellLeft + (int)Math.Round((CELL - DOOR_LEN) * offset);
+                                                    pxTop = cellTop - DOOR_THICK - DOOR_GAP;
+                                                }
+                                                else
+                                                {
+                                                    pxLeft = cellLeft + (int)Math.Round((CELL - DOOR_LEN) * offset);
+                                                    pxTop = cellTop + CELL + DOOR_GAP;
+                                                }
+
+                                                var wDoor = (side == "L" || side == "R") ? DOOR_THICK : DOOR_LEN;
+                                                var hDoor = (side == "L" || side == "R") ? DOOR_LEN : DOOR_THICK;
+
+                                                <div class="door" style="left:@(pxLeft)px; top:@(pxTop)px; width:@(wDoor)px; height:@(hDoor)px;" title="Door">
+                                                    <div class="door-panel"></div>
+                                                    <div class="door-panel"></div>
+                                                </div>
+                                            }
+                                        </div>
+
+                                        <!-- Grid -->
+                                        <div class="grid"
+                                             style="width:@(layoutW* CELL)px; height:@(layoutH* CELL)px;
+                                                            background-size:@(CELL)px @(CELL)px;
+                                                            background-image: linear-gradient(to right, rgba(0,0,0,.07) 1px, transparent 1px),
+                                                                              linear-gradient(to bottom, rgba(0,0,0,.07) 1px, transparent 1px);">
+
+                                            @foreach (var g in cellGroups)
+                                            {
+                                                var left = g.Key.X * CELL + PAD;
+                                                var top = g.Key.Y * CELL + PAD;
+
+                                                var list = g.ToList();
+                                                var count = list.Count;
+
+                                                <div class="cell-stack"
+                                                     style="left:@(left)px; top:@(top)px; width:@(CELL - PAD * 2)px; height:@(CELL - PAD * 2)px;"
+                                                     data-count="@count">
+                                                    @foreach (var it in list)
+                                                    {
+                                                        var type = (it.ElementType ?? "Seat");
+
+                                                        if (type.Equals("WC", StringComparison.OrdinalIgnoreCase))
+                                                        {
+                                                            <div class="wc" title="WC">🚻</div>
+                                                        }
+                                                        else if (type.Equals("Aisle", StringComparison.OrdinalIgnoreCase))
+                                                        {
+                                                            <div class="aisle" title="Aisle"></div>
+                                                        }
+                                                        else
+                                                        {
+                                                            var role = it.Role ?? "Passenger";
+                                                            var booked = IsBooked(it.SeatCode);
+
+                                                            <div class="seat @(booked ? "seat-booked" : "")"
+                                                                 style="background: @SeatBg(role, it.IsActive, booked);
+                                                                                            border-color: @SeatBorder(role, it.IsActive, booked);
+                                                                                            color: @SeatBorder(role, it.IsActive, booked);"
+                                                                 title="@($"{role} • {it.SeatCode} • ({it.X},{it.Y}) • {(it.IsActive ? "Active" : "Inactive")}{(booked ? " • BOOKED" : "")}")">
+                                                                @(it.SeatCode ?? "")
+                                                            </div>
+                                                        }
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style nonce="@nonce">
+    /* Info cards */
+    .info-card {
+        border: 1px solid rgba(0,0,0,.08);
+        border-radius: 14px;
+        padding: 12px;
+        background: rgba(13,110,253,.03);
+    }
+
+    [data-bs-theme="dark"] .info-card {
+        border-color: rgba(255,255,255,.10);
+        background: rgba(13,110,253,.10);
+    }
+
+    .booked-pill {
+        background: rgba(255,193,7,.25);
+        border: 1px solid #ffb300;
+        color: #8a5a00;
+    }
+
+    [data-bs-theme="dark"] .booked-pill {
+        color: #ffd37a;
+    }
+
+    /* Bus shell */
+    .bus-shell-portrait {
+        position: relative;
+        display: inline-block;
+        padding: 14px;
+        background: var(--bs-body-bg);
+        border: 4px solid rgba(44,62,80,.85);
+        border-radius: 26px;
+        overflow: visible;
+        box-shadow: 0 10px 22px rgba(0,0,0,.10);
+    }
+
+        .bus-shell-portrait::before {
+            content: "";
+            position: absolute;
+            left: -2px;
+            right: -2px;
+            top: -22px;
+            height: 46px;
+            background: linear-gradient(180deg, rgba(44,62,80,.95), rgba(44,62,80,.70));
+            border: 4px solid rgba(44,62,80,.85);
+            border-bottom: none;
+            border-radius: 60px 60px 18px 18px;
+            box-shadow: 0 10px 18px rgba(0,0,0,.12);
+            pointer-events: none;
+        }
+
+    .bus-interior {
+        padding: 10px;
+        border-radius: 18px;
+        border: 2px dashed rgba(0,0,0,.20);
+        background: var(--bs-body-bg);
+    }
+
+    [data-bs-theme="dark"] .bus-interior {
+        border-color: rgba(255,255,255,.18);
+    }
+
+    .grid-wrap {
+        position: relative;
+        display: inline-block;
+        overflow: visible;
+    }
+
+    .grid {
+        position: relative;
+        border-radius: 14px;
+        border: 2px solid rgba(0,0,0,.18);
+        background: var(--bs-body-bg);
+        overflow: hidden;
+    }
+
+    [data-bs-theme="dark"] .grid {
+        border-color: rgba(255,255,255,.14);
+    }
+
+    .door-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: visible;
+    }
+
+    /* Cell stack */
+    .cell-stack {
+        position: absolute;
+        display: grid;
+        gap: 2px;
+        align-content: stretch;
+        justify-content: stretch;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        z-index: 2;
+    }
+
+        .cell-stack[data-count="1"] {
+            grid-auto-flow: row;
+            grid-auto-rows: 1fr;
+        }
+
+        .cell-stack .seat,
+        .cell-stack .wc,
+        .cell-stack .aisle {
+            position: relative !important;
+            inset: auto !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+    .seat {
+        border: 2px solid;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,.10);
+        user-select: none;
+    }
+
+        .seat.seat-booked {
+            box-shadow: 0 6px 14px rgba(255,193,7,.35);
+            transform: translateY(-1px);
+        }
+
+    .wc {
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 16px;
+        background: radial-gradient(circle at 30% 30%, #f8f9fa, #e9ecef);
+        border: 2px solid #6c757d;
+        color: #6c757d;
+        box-shadow: 0 2px 6px rgba(0,0,0,.10);
+        user-select: none;
+    }
+
+    [data-bs-theme="dark"] .wc {
+        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.14), rgba(255,255,255,.06));
+    }
+
+    .aisle {
+        border-radius: 10px;
+        background: rgba(0,0,0,.05);
+        border: 1px dashed rgba(0,0,0,.15);
+    }
+
+    [data-bs-theme="dark"] .aisle {
+        background: rgba(255,255,255,.06);
+        border-color: rgba(255,255,255,.10);
+    }
+
+    .door {
+        position: absolute;
+        border-radius: 4px;
+        background: linear-gradient(90deg, rgba(255,193,7,.55), rgba(255,193,7,.18));
+        border: 2px solid #ff8f00;
+        box-shadow: 0 4px 12px rgba(0,0,0,.18);
+        display: flex;
+        gap: 2px;
+        padding: 2px;
+    }
+
+    .door-panel {
+        flex: 1;
+        background: rgba(255,255,255,.35);
+        border: 1px solid rgba(0,0,0,.12);
+        border-radius: 2px;
+    }
+</style>

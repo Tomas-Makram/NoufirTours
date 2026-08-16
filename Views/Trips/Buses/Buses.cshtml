@@ -1,0 +1,94 @@
+﻿@model List<NoufirTours.Models.Trips.Buses.BusListItemModel>
+
+@{
+    ViewData["Title"] = "Buses";
+    var q = (string?)ViewBag.Q ?? "";
+    var includeInactive = (bool)(ViewBag.IncludeInactive ?? false);
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="mb-1">Buses</h2>
+        <div class="text-muted">Manage your fleet (view, edit, details).</div>
+    </div>
+    <a class="btn btn-primary" asp-controller="Trips" asp-action="CreateNewBus">+ Add Bus</a>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-6">
+        <input name="q" value="@q" class="form-control" placeholder="Search by name, national id, address..." />
+    </div>
+    <div class="col-md-3 d-flex align-items-center">
+        <div class="form-check">
+            <input class="form-check-input"
+                   type="checkbox"
+                   name="includeArchived"
+                   value="true"
+                   @(includeInactive ? "checked" : "")
+                   id="includeArchived" />
+            <label class="form-check-label" for="includeArchived">Include archived</label>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <button class="btn btn-secondary w-100" type="submit">Search</button>
+    </div>
+
+</form>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Plate</th>
+                        <th>Chassis</th>
+                        <th>Model</th>
+                        <th>Seats</th>
+                        <th>Status</th>
+                        <th class="text-end" style="width:220px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model == null || Model.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">No buses found.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var b in Model)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@b.BusNumber</td>
+                                <td>@(b.PlateNumber ?? "-")</td>
+                                <td class="text-muted small">@b.ChassisNumber</td>
+                                <td>@(string.IsNullOrWhiteSpace(b.ModelName) ? "-" : $"{b.ModelName} {b.ModelYear}")</td>
+                                <td>@b.SeatsCount</td>
+                                <td>
+                                    <span class="badge rounded-pill @(b.IsActive ? "text-bg-success" : "text-bg-secondary")">
+                                        @(b.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       asp-controller="Trips" asp-action="BusDetails" asp-route-id="@b.Id">Details</a>
+
+                                    <a class="btn btn-sm btn-outline-warning"
+                                       asp-controller="Trips" asp-action="EditBus" asp-route-id="@b.Id">Edit</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

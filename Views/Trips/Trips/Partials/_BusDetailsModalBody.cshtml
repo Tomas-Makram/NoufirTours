@@ -1,0 +1,397 @@
+﻿@model NoufirTours.Models.Trips.Trips.BusModalDetailsModel
+@{
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    // ✅ Error short-circuit
+    if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger mb-0">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            @Model.ErrorMessage
+        </div>
+        return;
+    }
+
+    const int CELL = 44;
+    const int PAD = 3;
+
+    const int DOOR_THICK = 14;
+    const int DOOR_LEN = 36;
+    const int DOOR_GAP = 10;
+
+    var items = Model.Seats ?? new List<NoufirTours.Models.Trips.Trips.BusSeatModalRow>();
+
+    int passengerActive = items.Count(i =>
+        (i.ElementType ?? "Seat").Equals("Seat", StringComparison.OrdinalIgnoreCase) &&
+        ((i.Role ?? "Passenger") == "Passenger") &&
+        i.IsActive);
+
+    int doors = items.Count(i => (i.ElementType ?? "").Equals("Door", StringComparison.OrdinalIgnoreCase));
+    int wcs = items.Count(i => (i.ElementType ?? "").Equals("WC", StringComparison.OrdinalIgnoreCase));
+
+    string SeatBg(string? role, bool isActive)
+    {
+        if (!isActive) return "rgba(220,53,69,.12)";
+        role ??= "Passenger";
+        if (role == "Driver") return "rgba(13,110,253,.12)";
+        if (role == "Assistant") return "rgba(111,66,193,.12)";
+        return "rgba(25,135,84,.12)";
+    }
+
+    string SeatBorder(string? role, bool isActive)
+    {
+        if (!isActive) return "#dc3545";
+        role ??= "Passenger";
+        if (role == "Driver") return "#0d6efd";
+        if (role == "Assistant") return "#6f42c1";
+        return "#198754";
+    }
+
+    string Safe(string? v) => string.IsNullOrWhiteSpace(v) ? "-" : v;
+}
+
+<div class="row g-3">
+
+    <!-- LEFT: Overview فقط -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-info-circle"></i> Overview</span>
+
+                <span class="badge rounded-pill @(Model.IsActive ? "text-bg-success" : "text-bg-secondary")">
+                    @(Model.IsActive ? "Active" : "Inactive")
+                </span>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-2">
+
+                    <div class="col-6">
+                        <div class="text-muted small">Bus Number</div>
+                        <div class="fw-semibold">@Safe(Model.BusNumber)</div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">Plate</div>
+                        <div class="fw-semibold">@Safe(Model.PlateNumber)</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small">Chassis</div>
+                        <div class="fw-semibold">@Safe(Model.ChassisNumber)</div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">Manufacturer</div>
+                        <div class="fw-semibold">@Safe(Model.Manufacturer)</div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">Bus Type</div>
+                        <div class="fw-semibold">@Safe(Model.BusType)</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small">Model</div>
+                        <div class="fw-semibold">
+                            @(Safe(Model.ModelName) + (Model.ModelYear != null ? $" {Model.ModelYear}" : ""))
+                        </div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">Color</div>
+                        <div class="fw-semibold">@Safe(Model.Color)</div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">Passenger Seats</div>
+                        <div class="fw-semibold">@passengerActive</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small">Layout</div>
+                        <div class="fw-semibold">@Model.LayoutWidth × @Model.LayoutHeight</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small">Elements</div>
+                        <div class="fw-semibold">Doors: @doors • WC: @wcs</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small">Archived</div>
+                        <div class="fw-semibold">@(Model.IsArchived ? "Yes" : "No")</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Seat Layout + Specs + Notes تحت -->
+    <div class="col-lg-7">
+
+        <!-- Seat Layout -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-bus-front"></i> Seat Layout</span>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="badge rounded-pill"
+                          style="background:rgba(25,135,84,.14);border:1px solid #198754;color:#198754;">Passenger</span>
+                    <span class="badge rounded-pill"
+                          style="background:rgba(13,110,253,.14);border:1px solid #0d6efd;color:#0d6efd;">Driver</span>
+                    <span class="badge rounded-pill"
+                          style="background:rgba(111,66,193,.14);border:1px solid #6f42c1;color:#6f42c1;">Assistant</span>
+                    <span class="badge rounded-pill"
+                          style="background:rgba(220,53,69,.12);border:1px solid #dc3545;color:#dc3545;">Inactive</span>
+                    <span class="badge rounded-pill"
+                          style="background:rgba(255,193,7,.22);border:1px solid #ff8f00;color:#8a5a00;">Door</span>
+                    <span class="badge rounded-pill"
+                          style="background:rgba(108,117,125,.14);border:1px solid #6c757d;color:#6c757d;">WC</span>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="d-flex justify-content-center">
+                    <div class="bus-shell-portrait">
+                        <div class="bus-interior">
+                            <div class="grid-wrap">
+
+                                <!-- Door layer -->
+                                <div class="door-layer">
+                                    @foreach (var d in items.Where(i => (i.ElementType ?? "").Equals("Door", StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        var side = (d.DoorSide ?? "R").ToUpperInvariant();
+                                        var offset = d.DoorOffset ?? 0.5;
+
+                                        var cellLeft = d.X * CELL;
+                                        var cellTop = d.Y * CELL;
+
+                                        int pxLeft = 0, pxTop = 0;
+
+                                        if (side == "L")
+                                        {
+                                            pxLeft = cellLeft - DOOR_THICK - DOOR_GAP;
+                                            pxTop = cellTop + (int)Math.Round((CELL - DOOR_LEN) * offset);
+                                        }
+                                        else if (side == "R")
+                                        {
+                                            pxLeft = cellLeft + CELL + DOOR_GAP;
+                                            pxTop = cellTop + (int)Math.Round((CELL - DOOR_LEN) * offset);
+                                        }
+                                        else if (side == "T")
+                                        {
+                                            pxLeft = cellLeft + (int)Math.Round((CELL - DOOR_LEN) * offset);
+                                            pxTop = cellTop - DOOR_THICK - DOOR_GAP;
+                                        }
+                                        else
+                                        {
+                                            pxLeft = cellLeft + (int)Math.Round((CELL - DOOR_LEN) * offset);
+                                            pxTop = cellTop + CELL + DOOR_GAP;
+                                        }
+
+                                        var wDoor = (side == "L" || side == "R") ? DOOR_THICK : DOOR_LEN;
+                                        var hDoor = (side == "L" || side == "R") ? DOOR_LEN : DOOR_THICK;
+
+                                        <div class="door"
+                                             style="left:@(pxLeft)px; top:@(pxTop)px; width:@(wDoor)px; height:@(hDoor)px;"
+                                             title="Door">
+                                            <div class="door-panel"></div>
+                                            <div class="door-panel"></div>
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Grid -->
+                                <div class="grid"
+                                     style="width:@(Model.LayoutWidth* CELL)px;height:@(Model.LayoutHeight* CELL)px;
+                                            background-size:@(CELL)px @(CELL)px;
+                                            background-image: linear-gradient(to right, rgba(0,0,0,.07) 1px, transparent 1px),
+                                                              linear-gradient(to bottom, rgba(0,0,0,.07) 1px, transparent 1px);">
+
+                                    @foreach (var it in items.Where(i => !(i.ElementType ?? "").Equals("Door", StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        var type = (it.ElementType ?? "Seat");
+
+                                        if (type.Equals("WC", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <div class="wc"
+                                                 style="left:@(it.X* CELL +PAD)px;top:@(it.Y* CELL +PAD)px;width:@(CELL - PAD * 2)px;height:@(CELL - PAD * 2)px;"
+                                                 title="WC">
+                                                🚻
+                                            </div>
+                                        }
+                                        else if (type.Equals("Aisle", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <div class="aisle"
+                                                 style="left:@(it.X* CELL +PAD)px;top:@(it.Y* CELL +PAD)px;width:@(CELL - PAD * 2)px;height:@(CELL - PAD * 2)px;"
+                                                 title="Aisle"></div>
+                                        }
+                                        else
+                                        {
+                                            var role = it.Role ?? "Passenger";
+                                            <div class="seat"
+                                                 style="left:@(it.X* CELL +PAD)px;top:@(it.Y* CELL +PAD)px;width:@(CELL - PAD * 2)px;height:@(CELL - PAD * 2)px;
+                                                                        background:@SeatBg(role, it.IsActive);
+                                                                        border-color:@SeatBorder(role, it.IsActive);
+                                                                        color:@SeatBorder(role, it.IsActive);"
+                                                 title="@($"{role} • ({it.X},{it.Y}) • {(it.IsActive ? "Active" : "Inactive")}")">
+                                                @(it.SeatCode ?? "")
+                                            </div>
+                                        }
+                                    }
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-muted small mt-2 text-center">
+                    Passenger Active Seats: <b>@passengerActive</b>
+                </div>
+            </div>
+        </div>
+
+        <!-- Specifications -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header fw-semibold"><i class="bi bi-card-text"></i> Specifications</div>
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.Specs))
+                {
+                    <div style="white-space:pre-wrap">@Model.Specs</div>
+                }
+                else
+                {
+                    <div class="text-muted">-</div>
+                }
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="card shadow-sm">
+            <div class="card-header fw-semibold"><i class="bi bi-journal-text"></i> Notes</div>
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                {
+                    <div style="white-space:pre-wrap">@Model.Notes</div>
+                }
+                else
+                {
+                    <div class="text-muted">-</div>
+                }
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style nonce="@nonce">
+    .bus-shell-portrait {
+        position: relative;
+        display: inline-block;
+        padding: 14px;
+        background: #fff;
+        border: 4px solid #2c3e50;
+        border-radius: 26px;
+        overflow: visible;
+        box-shadow: 0 10px 22px rgba(0,0,0,.10);
+    }
+
+        .bus-shell-portrait::before {
+            content: "";
+            position: absolute;
+            left: -2px;
+            right: -2px;
+            top: -22px;
+            height: 46px;
+            background: linear-gradient(180deg, rgba(44,62,80,.95), rgba(44,62,80,.70));
+            border: 4px solid #2c3e50;
+            border-bottom: none;
+            border-radius: 60px 60px 18px 18px;
+            box-shadow: 0 10px 18px rgba(0,0,0,.12);
+            pointer-events: none;
+        }
+
+    .bus-interior {
+        padding: 10px;
+        border-radius: 18px;
+        border: 2px dashed rgba(0,0,0,.20);
+        background: #fff;
+    }
+
+    .grid-wrap {
+        position: relative;
+        display: inline-block;
+        overflow: visible;
+    }
+
+    .grid {
+        position: relative;
+        border-radius: 14px;
+        border: 2px solid rgba(0,0,0,.18);
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .door-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: visible;
+    }
+
+    .seat {
+        position: absolute;
+        border: 2px solid;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,.10);
+        user-select: none;
+    }
+
+    .wc {
+        position: absolute;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 16px;
+        background: radial-gradient(circle at 30% 30%, #f8f9fa, #e9ecef);
+        border: 2px solid #6c757d;
+        color: #6c757d;
+        box-shadow: 0 2px 6px rgba(0,0,0,.10);
+        user-select: none;
+    }
+
+    .aisle {
+        position: absolute;
+        border-radius: 10px;
+        background: rgba(0,0,0,.05);
+        border: 1px dashed rgba(0,0,0,.15);
+    }
+
+    .door {
+        position: absolute;
+        border-radius: 4px;
+        background: linear-gradient(90deg, rgba(255,193,7,.55), rgba(255,193,7,.18));
+        border: 2px solid #ff8f00;
+        box-shadow: 0 4px 12px rgba(0,0,0,.18);
+        display: flex;
+        gap: 2px;
+        padding: 2px;
+    }
+
+    .door-panel {
+        flex: 1;
+        background: rgba(255,255,255,.35);
+        border: 1px solid rgba(0,0,0,.12);
+        border-radius: 2px;
+    }
+</style>

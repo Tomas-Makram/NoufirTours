@@ -1,0 +1,1076 @@
+﻿@using NoufirTours.Data
+@model List<NoufirTours.Models.Trips.Trips.TripListItemModel>
+
+@{
+    ViewData["Title"] = "Trips";
+    var q = (ViewBag.Q as string) ?? "";
+    var includeArchived = (ViewBag.IncludeArchived as bool?) ?? true;
+    var filterType = (ViewBag.FilterType as string) ?? "";
+    var filterValue = (ViewBag.FilterValue as string) ?? "";
+    var nonce = Context.Items["CSPNonce"]?.ToString();
+
+    string Safe(string? v) => string.IsNullOrWhiteSpace(v) ? "-" : v;
+
+    string Money(decimal? v)
+    {
+        if (!v.HasValue) return "-";
+        return v.Value.ToString("0.##");
+    }
+
+    string RowClass(bool isArchived) => isArchived ? "row-archived" : "";
+
+    string GetPriceTypeBadge(TripPriceType priceType)
+    {
+        switch (priceType)
+        {
+            case TripPriceType.Go:
+                return "<span class=\"badge price-type-badge go-badge\"><i class=\"bi bi-arrow-right me-1\"></i>Go Only</span>";
+            case TripPriceType.Return:
+                return "<span class=\"badge price-type-badge return-badge\"><i class=\"bi bi-arrow-left me-1\"></i>Return Only</span>";
+            case TripPriceType.Round:
+                return "<span class=\"badge price-type-badge round-badge\"><i class=\"bi bi-arrow-left-right me-1\"></i>Round Trip</span>";
+            default:
+                return "";
+        }
+    }
+
+    bool IsFilterActive(string type, string value)
+    {
+        return filterType == type && filterValue == value;
+    }
+}
+
+<!-- Flatpickr CSS (Traditional) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<div class="trips-page">
+    <div class="container py-4">
+
+        <!-- ===== Top Bar ===== -->
+        <div class="trips-topbar mb-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="min-w-0">
+                    <h3 class="mb-0 page-title">Trips</h3>
+                    <div class="text-muted small">Search, view, and manage trips</div>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <form asp-action="ClearTripsNotBooking"
+                      asp-controller="Trips"
+                      method="post"
+                      class="d-inline">
+                    @Html.AntiForgeryToken()
+
+                    <button type="submit"
+                            class="btn btn-warning btn-sm rounded-pill px-3 shadow-sm d-inline-flex align-items-center gap-2"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="Delete future trips that have no bookings">
+                        <i class="bi bi-trash3-fill"></i>
+                        <span>Clear Trips</span>
+                    </button>
+                </form>
+
+                <a asp-action="AutoTripsSettings" asp-controller="Trips"
+                   class="btn btn-soft-warning btn-pill"
+                   title="Auto Trips Settings"
+                   data-bs-toggle="tooltip">
+                    <i class="bi bi-gear-fill me-1"></i> Auto Settings
+                </a>
+
+                <a asp-action="CreateNewTrip" asp-controller="Trips"
+                   class="btn btn-primary btn-pill">
+                    <i class="bi bi-plus-circle me-1"></i> New Trip
+                </a>
+            </div>
+        </div>
+
+        <!-- ===== Search / Filters ===== -->
+        <div class="card card-glass shadow-sm mb-3">
+            <div class="card-body">
+                <form method="get" id="searchForm">
+
+                    <div class="row g-2 align-items-center">
+                        <div class="col-auto">
+                            <label class="fw-semibold mb-0">Search</label>
+                        </div>
+
+                        <div class="col">
+                            <div class="input-group search-group" style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+
+                                <span class="input-group-text bg-white border-0">
+                                    <i class="bi bi-search text-muted"></i>
+                                </span>
+
+                                <input name="q"
+                                       value="@q"
+                                       class="form-control border-0 shadow-none"
+                                       placeholder="city, date, time, pickup, bus, driver, notes..."
+                                       id="searchInput" />
+
+                                <!-- ✅ Date Paket button (icon only) -->
+                                <button type="button"
+                                        class="btn date-btn border-0"
+                                        id="dateBtn"
+                                        title="Date"
+                                        aria-label="Pick date">
+                                    <span class="date-paket-ico" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M7 2.8V5.2M17 2.8V5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                            <path d="M4.5 8.2H19.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                            <path d="M6.2 21H17.8C19.015 21 20 20.015 20 18.8V7.6C20 6.385 19.015 5.4 17.8 5.4H6.2C4.985 5.4 4 6.385 4 7.6V18.8C4 20.015 4.985 21 6.2 21Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                                            <path d="M8 11H8.01M12 11H12.01M16 11H16.01M8 15H8.01M12 15H12.01M16 15H16.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                        </svg>
+                                    </span>
+                                </button>
+
+                                <!-- ✅ Hidden input for Flatpickr -->
+                                <input type="text" id="datePickerHidden" class="d-none" aria-hidden="true" />
+                            </div>
+                        </div>
+
+                        <div class="col-auto">
+                            <a asp-action="Trips"
+                               asp-controller="Trips"
+                               asp-route-includeArchived="true"
+                               class="btn btn-soft-outline">
+                                <i class="bi bi-x-circle me-1"></i> Clear
+                            </a>
+                        </div>
+
+                        <div class="col-auto">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-search me-1"></i> Apply
+                            </button>
+                        </div>
+
+                        <div class="col-auto">
+                            <div class="filter-pill d-inline-block">
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           id="includeArchived"
+                                           name="includeArchived"
+                                           value="true"
+                                           @(includeArchived ? "checked" : "")
+                                           onchange="this.form.submit();" />
+                                    <label class="form-check-label ms-2" for="includeArchived">
+                                        Include archived
+                                    </label>
+                                </div>
+                            </div>
+                            <input type="hidden" name="includeArchived" value="false" />
+                            <input type="hidden" name="filterType" value="@filterType" />
+                            <input type="hidden" name="filterValue" value="@filterValue" />
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+
+        <!-- ===== List ===== -->
+        <div class="card shadow-sm card-glass">
+            <div class="card-body">
+
+                @if (Model == null || Model.Count == 0)
+                {
+                    <div class="alert alert-warning mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <div>No trips found.</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                        <div class="text-muted small">
+                            Showing <span class="fw-bold">@Model.Count</span> trip(s)
+                            @if (!string.IsNullOrWhiteSpace(q))
+                            {
+                                <span class="ms-2 badge pill-badge">Filter: <b>@q</b></span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(filterType))
+                            {
+                                <span class="ms-2 badge pill-badge">@filterValue</span>
+                            }
+                        </div>
+
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <a asp-action="Trips" asp-controller="Trips"
+                               asp-route-filterType="status" asp-route-filterValue="active"
+                               asp-route-includeArchived="@includeArchived"
+                               class="badge status-badge active @(IsFilterActive("status", "active") ? "active-filter" : "")"
+                               style="cursor:pointer; text-decoration:none;">
+                                <i class="bi bi-check-circle-fill me-1"></i> Active
+                            </a>
+
+                            <a asp-action="Trips" asp-controller="Trips"
+                               asp-route-filterType="status" asp-route-filterValue="inactive"
+                               asp-route-includeArchived="@includeArchived"
+                               class="badge status-badge inactive @(IsFilterActive("status", "inactive") ? "active-filter" : "")"
+                               style="cursor:pointer; text-decoration:none;">
+                                <i class="bi bi-pause-circle-fill me-1"></i> Inactive
+                            </a>
+
+                            <a asp-action="Trips" asp-controller="Trips"
+                               asp-route-filterType="status" asp-route-filterValue="archived"
+                               asp-route-includeArchived="true"
+                               class="badge status-badge archived @(IsFilterActive("status", "archived") ? "active-filter" : "")"
+                               style="cursor:pointer; text-decoration:none;">
+                                <i class="bi bi-archive-fill me-1"></i> Archived
+                            </a>
+
+                            <a asp-action="Trips" asp-controller="Trips"
+                               asp-route-filterType="triptype" asp-route-filterValue="go"
+                               asp-route-includeArchived="@includeArchived"
+                               class="badge price-type-badge go-badge @(IsFilterActive("triptype", "go") ? "active-filter" : "")"
+                               style="cursor:pointer; text-decoration:none;">
+                                <i class="bi bi-arrow-right me-1"></i> Go
+                            </a>
+
+                            <a asp-action="Trips" asp-controller="Trips"
+                               asp-route-filterType="triptype" asp-route-filterValue="return"
+                               asp-route-includeArchived="@includeArchived"
+                               class="badge price-type-badge return-badge @(IsFilterActive("triptype", "return") ? "active-filter" : "")"
+                               style="cursor:pointer; text-decoration:none;">
+                                <i class="bi bi-arrow-left me-1"></i> Return
+                            </a>
+
+                            <a asp-action="Trips" asp-controller="Trips"
+                               asp-route-filterType="triptype" asp-route-filterValue="round"
+                               asp-route-includeArchived="@includeArchived"
+                               class="badge price-type-badge round-badge @(IsFilterActive("triptype", "round") ? "active-filter" : "")"
+                               style="cursor:pointer; text-decoration:none;">
+                                <i class="bi bi-arrow-left-right me-1"></i> Round
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle table-modern mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="min-width:180px;">Name / Type</th>
+                                    <th style="min-width:170px;">Date/Time</th>
+                                    <th style="min-width:210px;">Route</th>
+                                    <th style="min-width:300px;">Pickup</th>
+                                    <th style="min-width:150px;">Bus</th>
+                                    <th style="min-width:230px;">Driver</th>
+                                    <th style="min-width:180px;">Pricing</th>
+                                    <th style="width:190px;" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var t in Model)
+                                {
+                                    <tr class="@RowClass(t.IsArchived)">
+                                        <td>
+                                            <div class="d-flex flex-column gap-1">
+                                                <div class="fw-bold text-truncate" style="max-width:240px" title="@Safe(t.TripName)">
+                                                    @Safe(t.TripName)
+                                                </div>
+
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @if (t.IsArchived)
+                                                    {
+                                                        <span class="badge status-badge archived">
+                                                            <i class="bi bi-archive-fill me-1"></i> Archived
+                                                        </span>
+                                                    }
+                                                    else if (t.IsActive)
+                                                    {
+                                                        <span class="badge status-badge active">
+                                                            <i class="bi bi-check-circle-fill me-1"></i> Active
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge status-badge inactive">
+                                                            <i class="bi bi-pause-circle-fill me-1"></i> Inactive
+                                                        </span>
+                                                    }
+
+                                                    @Html.Raw(GetPriceTypeBadge(t.PriceType))
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            <div class="fw-semibold">@Safe(t.DepartDate)</div>
+                                            <div class="text-muted small">
+                                                <i class="bi bi-clock me-1"></i>@Safe(t.DepartTime)
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            <div class="fw-semibold">
+                                                @Safe(t.FromCity)
+                                                <i class="bi bi-arrow-right-short"></i>
+                                                @Safe(t.ToCity)
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(t.DropoffPlace))
+                                            {
+                                                <div class="text-muted small text-truncate" style="max-width:320px" title="@t.DropoffPlace">
+                                                    Dropoff: @t.DropoffPlace
+                                                </div>
+                                            }
+                                        </td>
+
+                                        <td>
+                                            <div class="text-truncate" style="max-width:520px;" title="@Safe(t.PickupPlace)">
+                                                @Safe(t.PickupPlace)
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            <span class="chip">
+                                                <i class="bi bi-bus-front me-1"></i>
+                                                @Safe(t.BusNumber)
+                                            </span>
+                                        </td>
+
+                                        <td>
+                                            @if (!string.IsNullOrWhiteSpace(t.DriverFullName))
+                                            {
+                                                <div class="fw-semibold">@t.DriverFullName</div>
+
+                                                @if (!string.IsNullOrWhiteSpace(t.DriverName) || !string.IsNullOrWhiteSpace(t.DriverPhone))
+                                                {
+                                                    <div class="text-muted small">
+                                                        Override: @Safe(t.DriverName) • @Safe(t.DriverPhone)
+                                                    </div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <div class="fw-semibold">@Safe(t.DriverName)</div>
+                                                <div class="text-muted small">@Safe(t.DriverPhone)</div>
+                                            }
+                                        </td>
+
+                                        <td>
+                                            @if (t.PriceType == TripPriceType.Go)
+                                            {
+                                                <div class="pricing-cell go-pricing">
+                                                    <span class="badge price-badge go-price">
+                                                        <i class="bi bi-arrow-right me-1"></i> Go: <b>@Money(t.SeatPriceGo)</b>
+                                                    </span>
+                                                </div>
+                                            }
+                                            else if (t.PriceType == TripPriceType.Return)
+                                            {
+                                                <div class="pricing-cell return-pricing">
+                                                    <span class="badge price-badge return-price">
+                                                        <i class="bi bi-arrow-left me-1"></i> Return: <b>@Money(t.SeatPriceReturn)</b>
+                                                    </span>
+                                                </div>
+                                            }
+                                            else if (t.PriceType == TripPriceType.Round)
+                                            {
+                                                <div class="pricing-cell round-pricing">
+                                                    <div class="d-flex flex-column gap-1">
+                                                        <span class="badge price-badge round-total">Go: <b>@Money(t.SeatPriceGo)</b></span>
+                                                        <span class="badge price-badge round-total">Return: <b>@Money(t.SeatPriceReturn)</b></span>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </td>
+
+                                        <td class="text-end">
+                                            <div class="btn-group actions-group" role="group">
+                                                <a class="btn btn-soft-primary btn-sm"
+                                                   title="Details"
+                                                   data-bs-toggle="tooltip"
+                                                   asp-action="TripDetails"
+                                                   asp-controller="Trips"
+                                                   asp-route-id="@t.Id">
+                                                    <i class="bi bi-eye me-1"></i> Details
+                                                </a>
+
+                                                <a class="btn btn-soft-warning btn-sm"
+                                                   title="Edit"
+                                                   data-bs-toggle="tooltip"
+                                                   asp-action="EditTrip"
+                                                   asp-controller="Trips"
+                                                   asp-route-id="@t.Id">
+                                                    <i class="bi bi-pencil-square me-1"></i> Edit
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+
+                        </table>
+                    </div>
+                }
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Flatpickr JS -->
+    <script nonce="@nonce" src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <script nonce="@nonce">
+        document.addEventListener('DOMContentLoaded', function () {
+
+            const searchInput = document.getElementById('searchInput');
+            const form = document.getElementById('searchForm');
+            const hiddenInput = document.getElementById('datePickerHidden');
+            const dateBtn = document.getElementById('dateBtn');
+
+            const fp = flatpickr(hiddenInput, {
+                enableTime: false,
+                dateFormat: "Y-m-d",
+                monthSelectorType: "static",
+                showMonths: 1,
+                allowInput: false,
+                clickOpens: false,
+
+                // ✅ الحل النهائي: خليها بره input-group (عشان overflow:hidden ما يقتلهاش)
+                appendTo: document.body,
+                positionElement: dateBtn,
+                position: "below left",
+
+                onChange: function (selectedDates, dateStr, instance) {
+                    if (selectedDates.length > 0) {
+                        searchInput.value = dateStr;
+                        form.submit();
+                    }
+                },
+
+                onReady: function (selectedDates, dateStr, instance) {
+
+                    const clearBtn = document.createElement('button');
+                    clearBtn.type = 'button';
+                    clearBtn.innerHTML = 'Clear';
+                    clearBtn.className = 'flatpickr-clear-btn';
+                    clearBtn.addEventListener('click', function () {
+                        instance.clear();
+                        instance.close();
+                    });
+
+                    const todayBtn = document.createElement('button');
+                    todayBtn.type = 'button';
+                    todayBtn.innerHTML = 'Today';
+                    todayBtn.className = 'flatpickr-today-btn';
+                    todayBtn.addEventListener('click', function () {
+                        instance.setDate(new Date(), true);
+                    });
+
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.className = 'flatpickr-button-container';
+                    buttonContainer.appendChild(clearBtn);
+                    buttonContainer.appendChild(todayBtn);
+
+                    instance.calendarContainer.appendChild(buttonContainer);
+                }
+            });
+
+            dateBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                fp.open();
+            });
+        });
+    </script>
+}
+
+<style nonce="@nonce">
+    :root {
+        --nt-blue-900: #0b2a55;
+        --nt-blue-700: #1357b8;
+        --nt-blue-600: #1d6ee6;
+        --nt-blue-100: rgba(29, 110, 230, .10);
+        --nt-blue-075: rgba(29, 110, 230, .075);
+        --nt-yellow-600: #f4b400;
+        --nt-yellow-100: rgba(244, 180, 0, .14);
+        --nt-slate-900: #0f172a;
+        --nt-slate-700: rgba(15,23,42,.72);
+        --nt-border: rgba(15,23,42,.10);
+        --nt-go-color: #0d6efd;
+        --nt-go-bg: rgba(13, 110, 253, 0.1);
+        --nt-return-color: #0dcaf0;
+        --nt-return-bg: rgba(13, 202, 240, 0.1);
+        --nt-round-color: #ffc107;
+        --nt-round-bg: rgba(255, 193, 7, 0.1);
+        --nt-round-total-color: #198754;
+        --nt-round-total-bg: rgba(25, 135, 84, 0.1);
+    }
+
+    .trips-page {
+        background: radial-gradient(900px 520px at 18% 18%, rgba(29,110,230,.12), transparent 62%), radial-gradient(900px 520px at 82% 20%, rgba(244,180,0,.10), transparent 58%), linear-gradient(180deg, rgba(248,250,252,.94), rgba(239,246,255,.90));
+        min-height: calc(100vh - 120px);
+    }
+
+    .trips-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 6px 0;
+    }
+
+    .page-title {
+        letter-spacing: .2px;
+        color: rgba(15,23,42,.88);
+        font-weight: 900;
+    }
+
+    .topbar-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .card-glass {
+        border: 1px solid rgba(15,23,42,.08);
+        background: rgba(255,255,255,.78);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 18px;
+    }
+
+    .btn-pill {
+        border-radius: 999px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--nt-blue-700), var(--nt-blue-600));
+        border: none;
+        box-shadow: 0 10px 22px rgba(29,110,230,.18);
+        font-weight: 800;
+    }
+
+        .btn-primary:hover {
+            filter: brightness(0.98);
+            box-shadow: 0 12px 26px rgba(29,110,230,.22);
+        }
+
+    .btn-soft-warning {
+        background: var(--nt-yellow-100);
+        border: 1px solid rgba(244,180,0,.35);
+        color: #7a5a00;
+        font-weight: 800;
+    }
+
+        .btn-soft-warning:hover {
+            background: rgba(244,180,0,.20);
+            color: #6a4d00;
+        }
+
+    .btn-soft-outline {
+        border: 1px solid var(--nt-border);
+        background: rgba(255,255,255,.80);
+        color: rgba(15,23,42,.78);
+        font-weight: 800;
+    }
+
+        .btn-soft-outline:hover {
+            background: rgba(248,250,252,.95);
+            color: rgba(15,23,42,.88);
+        }
+
+    .filter-pill {
+        border: 1px solid rgba(15,23,42,.10);
+        background: rgba(255,255,255,.70);
+        padding: 10px 12px;
+        border-radius: 14px;
+        white-space: nowrap;
+    }
+
+    .search-group .input-group-text {
+        background: white;
+        border: none;
+    }
+
+    .search-group .form-control {
+        background: white;
+        border: none;
+        padding-left: 0;
+    }
+
+        .search-group .form-control:focus {
+            outline: none;
+            box-shadow: none;
+        }
+
+    .flatpickr-button-container {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+        padding: 10px 10px 0 10px;
+        border-top: 1px solid rgba(0,0,0,.08);
+    }
+
+    .flatpickr-clear-btn, .flatpickr-today-btn {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid rgba(0,0,0,.12);
+        background: #fff;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+        .flatpickr-clear-btn:hover {
+            background: #f8f9fa;
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+
+        .flatpickr-today-btn:hover {
+            background: #f8f9fa;
+            border-color: var(--nt-blue-600);
+            color: var(--nt-blue-600);
+        }
+
+    .table-modern {
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+        .table-modern thead th {
+            background: linear-gradient(180deg, rgba(29,110,230,.08), rgba(29,110,230,.04));
+            border-bottom: 1px solid rgba(15,23,42,.10);
+            font-weight: 900;
+            color: rgba(15,23,42,.80);
+            padding-top: 14px;
+            padding-bottom: 14px;
+        }
+
+        .table-modern tbody td, .table-modern tbody th {
+            border-top: 1px solid rgba(15,23,42,.06);
+            padding-top: 12px;
+            padding-bottom: 12px;
+        }
+
+    .table-hover tbody tr:hover {
+        background: rgba(29,110,230,.035);
+    }
+
+    .row-archived {
+        background: rgba(220, 53, 69, .06) !important;
+    }
+
+    .status-badge {
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-weight: 900;
+        letter-spacing: .2px;
+        border: 1px solid transparent;
+        white-space: nowrap;
+        font-size: 0.7rem;
+        display: inline-block;
+        transition: all 0.2s ease;
+    }
+
+        .status-badge.active {
+            background: var(--nt-blue-075);
+            border-color: rgba(29,110,230,.28);
+            color: #0d4fb6;
+        }
+
+        .status-badge.archived {
+            background: rgba(220,53,69,.10);
+            border-color: rgba(220,53,69,.30);
+            color: #dc3545;
+        }
+
+        .status-badge.inactive {
+            background: rgba(108,117,125,.12);
+            border-color: rgba(108,117,125,.28);
+            color: #6c757d;
+        }
+
+    .price-type-badge {
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-weight: 900;
+        font-size: 0.7rem;
+        border: 1px solid transparent;
+        white-space: nowrap;
+        display: inline-block;
+        transition: all 0.2s ease;
+    }
+
+    .go-badge {
+        background: var(--nt-go-bg);
+        border-color: rgba(13, 110, 253, 0.28);
+        color: var(--nt-go-color);
+    }
+
+    .return-badge {
+        background: var(--nt-return-bg);
+        border-color: rgba(13, 202, 240, 0.28);
+        color: var(--nt-return-color);
+    }
+
+    .round-badge {
+        background: var(--nt-round-bg);
+        border-color: rgba(255, 193, 7, 0.28);
+        color: #856404;
+    }
+
+    .active-filter {
+        border: 2px solid currentColor !important;
+        transform: scale(1.05);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .pill-badge {
+        border-radius: 999px;
+        padding: 8px 12px;
+        background: rgba(244,180,0,.12);
+        border: 1px solid rgba(244,180,0,.25);
+        color: rgba(15,23,42,.82);
+        font-weight: 800;
+    }
+
+    .pricing-cell {
+        min-width: 100px;
+    }
+
+    .price-badge {
+        background: rgba(248,250,252,.95);
+        border: 1px solid rgba(15,23,42,.10);
+        color: rgba(15,23,42,.82);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-weight: 800;
+        font-size: 0.8rem;
+    }
+
+    .go-price {
+        background: var(--nt-go-bg);
+        border-color: rgba(13, 110, 253, 0.28);
+        color: var(--nt-go-color);
+    }
+
+    .return-price {
+        background: var(--nt-return-bg);
+        border-color: rgba(13, 202, 240, 0.28);
+        color: var(--nt-return-color);
+    }
+
+    .round-total {
+        background: var(--nt-round-total-bg);
+        border-color: rgba(25, 135, 84, 0.28);
+        color: var(--nt-round-total-color);
+        font-weight: 900;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(29,110,230,.07);
+        border: 1px solid rgba(29,110,230,.18);
+        color: rgba(15,23,42,.82);
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .actions-group .btn {
+        border-radius: 12px !important;
+        border: 1px solid rgba(15,23,42,.10);
+        font-weight: 900;
+        padding: 8px 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+
+    .btn-soft-primary {
+        background: rgba(29,110,230,.10);
+        color: #0d4fb6;
+    }
+
+        .btn-soft-primary:hover {
+            background: rgba(29,110,230,.16);
+            color: #0d4fb6;
+        }
+
+    .table td, .table th {
+        vertical-align: middle;
+    }
+
+    @@media (max-width: 992px) {
+        .trips-topbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .topbar-actions {
+            justify-content: stretch;
+        }
+
+            .topbar-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+        .actions-group {
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+            .actions-group .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+        .row.g-2.align-items-center > [class*="col-"] {
+            width: 100%;
+            margin-bottom: 8px;
+        }
+
+        .filter-pill {
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    .date-btn {
+        background: #fff !important;
+        color: var(--nt-blue-600) !important;
+        font-weight: 800;
+        border-radius: 0 !important;
+        border-left: 4px solid var(--nt-blue-600) !important;
+        padding: 0.375rem 0.95rem !important;
+        min-width: 56px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: none !important;
+    }
+
+        .date-btn:hover {
+            background: #f8fbff !important;
+        }
+
+    .date-paket-ico {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .date-btn svg {
+        display: block;
+    }
+
+    /* =========================================================
+           ✅ THEME PATCH (Light/Dark) - ONLY OVERRIDES (no HTML change)
+           Put at the end so it wins over earlier rules
+           ========================================================= */
+
+    /* Light defaults (keeps your design, just controlled by vars) */
+    :root {
+        --nt-surface: #ffffff;
+        --nt-surface-2: rgba(255,255,255,.78);
+        --nt-surface-3: rgba(255,255,255,.90);
+        --nt-text: rgba(15,23,42,.88);
+        --nt-text-2: rgba(15,23,42,.78);
+        --nt-muted2: rgba(15,23,42,.62);
+        --nt-borderx: rgba(15,23,42,.10);
+        --nt-borderx2: rgba(15,23,42,.14);
+        --nt-row-hover: rgba(29,110,230,.035);
+        --nt-row-archived: rgba(220,53,69,.10);
+        --nt-input-bg: #fff;
+        --nt-input-ico: rgba(15,23,42,.55);
+        --nt-input-border: rgba(15,23,42,.10);
+        --nt-date-bg: #fff;
+        --nt-flat-bg: #fff;
+        --nt-flat-border: rgba(0,0,0,.12);
+        --nt-flat-text: rgba(15,23,42,.88);
+    }
+
+    /* Dark mode */
+    [data-bs-theme="dark"] {
+        --nt-surface: #1f2328;
+        --nt-surface-2: rgba(16,20,24,.72);
+        --nt-surface-3: rgba(16,20,24,.84);
+        --nt-text: rgba(255,255,255,.92);
+        --nt-text-2: rgba(255,255,255,.82);
+        --nt-muted2: rgba(255,255,255,.62);
+        --nt-borderx: rgba(255,255,255,.12);
+        --nt-borderx2: rgba(255,255,255,.18);
+        --nt-row-hover: rgba(13,110,253,.12);
+        --nt-row-archived: rgba(220,53,69,.16);
+        --nt-input-bg: #101418;
+        --nt-input-ico: rgba(255,255,255,.55);
+        --nt-input-border: rgba(255,255,255,.14);
+        --nt-date-bg: #101418;
+        --nt-flat-bg: #101418;
+        --nt-flat-border: rgba(255,255,255,.14);
+        --nt-flat-text: rgba(255,255,255,.92);
+    }
+
+        /* Page background for dark (override your light gradient) */
+        [data-bs-theme="dark"] .trips-page {
+            background: radial-gradient(900px 520px at 18% 18%, rgba(13,110,253,.18), transparent 62%), radial-gradient(900px 520px at 82% 20%, rgba(244,180,0,.10), transparent 58%), linear-gradient(180deg, rgba(12,15,18,.96), rgba(10,12,14,.94)) !important;
+        }
+
+        /* Text */
+        [data-bs-theme="dark"] .page-title {
+            color: var(--nt-text) !important;
+        }
+
+        [data-bs-theme="dark"] .text-muted {
+            color: var(--nt-muted2) !important;
+        }
+
+        /* Glass cards */
+        [data-bs-theme="dark"] .card-glass {
+            background: var(--nt-surface-2) !important;
+            border-color: var(--nt-borderx) !important;
+        }
+
+        /* Search group outer inline border */
+        [data-bs-theme="dark"] .search-group {
+            border-color: var(--nt-input-border) !important;
+            background: var(--nt-input-bg) !important;
+        }
+
+            /* Search input + addon */
+            [data-bs-theme="dark"] .search-group .input-group-text {
+                background: var(--nt-input-bg) !important;
+                color: var(--nt-input-ico) !important;
+            }
+
+            [data-bs-theme="dark"] .search-group .form-control {
+                background: var(--nt-input-bg) !important;
+                color: var(--nt-flat-text) !important;
+            }
+
+                [data-bs-theme="dark"] .search-group .form-control::placeholder {
+                    color: rgba(255,255,255,.45) !important;
+                }
+
+        /* Filter pill */
+        [data-bs-theme="dark"] .filter-pill {
+            background: var(--nt-surface-2) !important;
+            border-color: var(--nt-borderx) !important;
+            color: var(--nt-text-2) !important;
+        }
+
+            [data-bs-theme="dark"] .filter-pill .form-check-label {
+                color: var(--nt-text-2) !important;
+            }
+
+        /* Table head / rows */
+        [data-bs-theme="dark"] .table-modern thead th {
+            background: linear-gradient(180deg, rgba(13,110,253,.14), rgba(13,110,253,.07)) !important;
+            border-bottom-color: var(--nt-borderx) !important;
+            color: var(--nt-text-2) !important;
+        }
+
+        [data-bs-theme="dark"] .table-modern tbody td,
+        [data-bs-theme="dark"] .table-modern tbody th {
+            border-top-color: rgba(255,255,255,.08) !important;
+            color: var(--nt-text-2) !important;
+        }
+
+        [data-bs-theme="dark"] .table-hover tbody tr:hover {
+            background: var(--nt-row-hover) !important;
+        }
+
+        [data-bs-theme="dark"] .row-archived {
+            background: var(--nt-row-archived) !important;
+        }
+
+        /* Chip */
+        [data-bs-theme="dark"] .chip {
+            background: rgba(13,110,253,.14) !important;
+            border-color: rgba(13,110,253,.22) !important;
+            color: rgba(255,255,255,.88) !important;
+        }
+
+        /* Price badge base */
+        [data-bs-theme="dark"] .price-badge {
+            background: rgba(16,20,24,.92) !important;
+            border-color: var(--nt-borderx) !important;
+            color: var(--nt-text-2) !important;
+        }
+
+        /* Actions buttons borders */
+        [data-bs-theme="dark"] .actions-group .btn {
+            border-color: var(--nt-borderx) !important;
+        }
+
+        /* Date button */
+        [data-bs-theme="dark"] .date-btn {
+            background: var(--nt-date-bg) !important;
+            border-left-color: rgba(13,110,253,.85) !important;
+        }
+
+            [data-bs-theme="dark"] .date-btn:hover {
+                background: rgba(13,110,253,.10) !important;
+            }
+
+        /* Flatpickr popup (dark) */
+        [data-bs-theme="dark"] .flatpickr-calendar {
+            background: var(--nt-flat-bg) !important;
+            border: 1px solid var(--nt-flat-border) !important;
+            box-shadow: 0 18px 40px rgba(0,0,0,.45) !important;
+            color: var(--nt-flat-text) !important;
+        }
+
+        [data-bs-theme="dark"] .flatpickr-months,
+        [data-bs-theme="dark"] .flatpickr-weekdays {
+            background: transparent !important;
+            color: var(--nt-flat-text) !important;
+        }
+
+        [data-bs-theme="dark"] .flatpickr-day {
+            color: rgba(255,255,255,.82) !important;
+        }
+
+            [data-bs-theme="dark"] .flatpickr-day:hover {
+                background: rgba(13,110,253,.18) !important;
+                border-color: transparent !important;
+            }
+
+            [data-bs-theme="dark"] .flatpickr-day.selected,
+            [data-bs-theme="dark"] .flatpickr-day.startRange,
+            [data-bs-theme="dark"] .flatpickr-day.endRange {
+                background: rgba(13,110,253,.80) !important;
+                border-color: rgba(13,110,253,.80) !important;
+                color: #fff !important;
+            }
+
+        /* Flatpickr custom buttons */
+        [data-bs-theme="dark"] .flatpickr-button-container {
+            border-top-color: rgba(255,255,255,.10) !important;
+        }
+
+        [data-bs-theme="dark"] .flatpickr-clear-btn,
+        [data-bs-theme="dark"] .flatpickr-today-btn {
+            background: rgba(255,255,255,.06) !important;
+            border-color: rgba(255,255,255,.14) !important;
+            color: rgba(255,255,255,.86) !important;
+        }
+
+            [data-bs-theme="dark"] .flatpickr-clear-btn:hover {
+                background: rgba(220,53,69,.14) !important;
+                border-color: rgba(220,53,69,.40) !important;
+                color: #ffb3b3 !important;
+            }
+
+            [data-bs-theme="dark"] .flatpickr-today-btn:hover {
+                background: rgba(13,110,253,.14) !important;
+                border-color: rgba(13,110,253,.40) !important;
+                color: #b8d4ff !important;
+            }
+</style>

@@ -1,0 +1,185 @@
+﻿@model NoufirTours.Models.Dashboard.DashboardTripDetailsModel
+@{
+    Layout = null;
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+    string V(string? s) => string.IsNullOrWhiteSpace(s) ? "-" : s.Trim();
+}
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trip Print - @Model.TripName</title>
+
+    <style nonce="@nonce">
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 18px;
+            color: #111;
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        .meta {
+            color: #444;
+            font-size: 13px;
+        }
+
+        .btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .btn-primary {
+            border-color: #0d6efd;
+            color: #0d6efd;
+        }
+
+        hr {
+            margin: 14px 0;
+            border: none;
+            border-top: 1px solid #eee;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+
+        th {
+            font-size: 12px;
+            color: #444;
+        }
+
+        td {
+            font-size: 13px;
+        }
+
+        .muted {
+            color: #666;
+        }
+
+        @@media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top">
+        <div>
+            <div class="title">@Model.TripName</div>
+            <div class="meta">
+                <strong>@Model.DepartDate</strong> • <strong>@Model.DepartTime</strong>
+                <span class="muted">|</span>
+                @V(Model.FromCity) → @V(Model.ToCity)
+            </div>
+            <div class="meta">Bookings: <strong>@(Model.Bookings?.Count ?? 0)</strong></div>
+        </div>
+
+        <!-- ✅ تعديل الجزء ده فقط (إزالة onclick + IDs) -->
+        <div class="btns no-print">
+            <button id="btnPrint" type="button" class="btn btn-primary">Print / Save PDF</button>
+            <button id="btnBack" type="button" class="btn">Back</button>
+        </div>
+    </div>
+
+    <!-- ✅ إضافة script بنونص (ده جزء الزرار/الطباعة) -->
+    <script nonce="@nonce">
+        (function () {
+            const btnPrint = document.getElementById('btnPrint');
+            const btnBack = document.getElementById('btnBack');
+
+            if (btnPrint) {
+                btnPrint.addEventListener('click', function () {
+                    window.print();
+                });
+            }
+
+            if (btnBack) {
+                btnBack.addEventListener('click', function () {
+                    // لو الصفحة اتفتحت في tab جديدة: رجوع أو قفل
+                    if (window.history.length > 1) {
+                        window.history.back();
+                    } else {
+                        window.close();
+                    }
+                });
+            }
+        })();
+    </script>
+
+    <hr />
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width:14%;">Company</th>
+                <th style="width:12%;">Customer</th>
+                <th style="width:15%;">Notes</>
+                <th style="width:14%;">Phone</th>
+                <th style="width:14%;">Route</th>
+                <th style="width:22%;">Dropoff Place</th>
+                <th style="width:10%;">Seats</th>
+                <th style="width:6%;">Id</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Bookings == null || Model.Bookings.Count == 0)
+            {
+                <tr><td colspan="6" class="muted">No bookings.</td></tr>
+            }
+            else
+            {
+                foreach (var b in Model.Bookings)
+                {
+                    <tr>
+                        <td><strong>@b.CompanyFrom</strong></td>
+                        <td>@b.CustomerName</td>
+                        <td>@b.Description</td>
+                        <td>@b.Phone</td>
+                        <td>@b.TripSegment</td>
+                        <td>@V(b.CustomerDropoffPlace)</td>
+                        <td><strong>@V(b.SeatsText)</strong></td>
+                        <td class="muted">@b.BookingId</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+</body>
+</html>

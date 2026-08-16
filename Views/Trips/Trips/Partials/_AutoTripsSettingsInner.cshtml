@@ -1,0 +1,274 @@
+﻿@model NoufirTours.Models.Trips.Trips.AutoTripsPlannerModel
+
+@{
+    var scheduleType = Model?.ScheduleType ?? 1;
+    var isSpecific = (scheduleType == 2);
+
+    // PlannerMode inferred from CheckDate
+    var modeIsDate = !string.IsNullOrWhiteSpace(Model?.CheckDate);
+
+    string todayIso = DateTime.Today.ToString("yyyy-MM-dd");
+    var checkDateIso = !string.IsNullOrWhiteSpace(Model?.CheckDate) ? Model!.CheckDate! : todayIso;
+
+    var specificDateIso = Model?.SpecificDate ?? "";
+
+    // enforce display limit in UI
+    var maxSlots = (Model?.DisplaySlots ?? 0);
+    if (maxSlots <= 0) { maxSlots = 1; }
+
+    var allTemplates = (Model?.Templates ?? new List<NoufirTours.Models.Trips.Trips.AutoTripTemplateRowModel>())
+        .OrderBy(x => x.OrderNo)
+        .ToList();
+
+    var shownTemplates = allTemplates
+        .Where(t => t.OrderNo <= maxSlots)
+        .OrderBy(t => t.OrderNo)
+        .ToList();
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+
+        @* ✅ IMPORTANT: الفورم لازم يلف Trips List عشان Templates تتبعت مع Save *@
+        <form id="planForm" method="post" asp-action="AutoTripsSettings" asp-controller="Trips" class="mb-0">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="PlanId" value="@Model!.PlanId" />
+
+            <!-- ===================== Plan Header ===================== -->
+            <div class="row g-3 align-items-end mb-4">
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Plan Name</label>
+                    <input class="form-control" name="Name" value="@Model.Name" maxlength="80" />
+                </div>
+
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Notes</label>
+                    <input class="form-control" name="Notes" value="@Model.Notes" maxlength="200" />
+                </div>
+
+                <div class="col-lg-3">
+                    <label class="form-label fw-semibold d-block">Enable Auto Plan</label>
+                    <div class="form-check form-switch">
+                        @* ✅ checkbox FIRST, hidden false AFTER *@
+                        <input id="autoPlanEnabled"
+                               class="form-check-input"
+                               type="checkbox"
+                               name="IsEnabled"
+                               value="true"
+                               @(Model.IsEnabled ? "checked" : "") />
+                        <input type="hidden" name="IsEnabled" value="false" />
+
+                        <label class="form-check-label" for="autoPlanEnabled">Enabled</label>
+                    </div>
+                </div>
+
+                <div class="col-lg-1 text-end">
+                    <button type="submit" class="btn btn-primary w-100">Save</button>
+                </div>
+            </div>
+
+            <hr class="my-4" />
+
+            <!-- ===================== Schedule UI ===================== -->
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Schedule Type</label>
+
+                    @* ✅ NO C# inside <option ...> attributes *@
+                    <select id="scheduleTypeSelect" name="ScheduleType" class="form-select">
+                        @if (scheduleType == 1)
+                        {
+                            <option value="1" selected="selected">Daily</option>
+                            <option value="2">Specific Date</option>
+                        }
+                        else
+                        {
+                            <option value="1">Daily</option>
+                            <option value="2" selected="selected">Specific Date</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-lg-4" id="planSpecificDateWrap" style="display:@(isSpecific ? "" : "none")">
+                    <label class="form-label fw-semibold">Specific Date</label>
+                    <input id="specificDateInput"
+                           name="SpecificDate"
+                           class="form-control"
+                           type="date"
+                           value="@specificDateIso"
+                           @(isSpecific ? "required" : "") />
+                    <div class="text-danger small mt-1" style="display:none" id="specificDateMsg">
+                        Please select a specific date.
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Activation Mode</label>
+
+                    @* ✅ NO C# inside <option ...> attributes *@
+                    <select name="ActivationMode" class="form-select">
+                        @if ((Model?.ActivationMode ?? 1) == 1)
+                        {
+                            <option value="1" selected="selected">Sequential (First Active Only)</option>
+                            <option value="2">All Active</option>
+                        }
+                        else
+                        {
+                            <option value="1">Sequential (First Active Only)</option>
+                            <option value="2" selected="selected">All Active</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div id="autoPlanBody" class="mt-4" style="display:@(Model.IsEnabled ? "" : "none")">
+
+                <!-- ===================== Planner Mode ===================== -->
+                <div class="mt-3">
+                    <h6 class="fw-bold mb-3">Planner Mode</h6>
+
+                    <div class="d-flex flex-wrap gap-4 align-items-start">
+                        <div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="plannerMode" id="pmDb" value="db" @(modeIsDate ? "" : "checked") />
+                                <label class="form-check-label" for="pmDb">Show by DB (ignore date)</label>
+                            </div>
+
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="radio" name="plannerMode" id="pmDate" value="date" @(modeIsDate ? "checked" : "") />
+                                <label class="form-check-label" for="pmDate">Show by Selected Date</label>
+                            </div>
+
+                            <div id="checkDateWrap" class="mt-3" style="display:@(modeIsDate ? "" : "none")">
+                                <label class="form-label fw-semibold">Check Date</label>
+                                @* ملحوظة: ده للـ Ajax/UI، مش لازم يتبعت للـ POST *@
+                                <input id="checkDateInput" class="form-control" type="date" value="@checkDateIso" />
+                                <div class="text-muted small mt-1">Used only when mode = Selected Date.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-3 ms-auto">
+                            <div class="border rounded-3 p-3" style="min-width:220px;">
+                                <div class="text-muted">Available Buses</div>
+                                <div class="fs-2 fw-bold">@Model.AvailableBusesCount</div>
+                            </div>
+                            <div class="border rounded-3 p-3" style="min-width:220px;">
+                                <div class="text-muted">Available Drivers</div>
+                                <div class="fs-2 fw-bold">@Model.AvailableDriversCount</div>
+                            </div>
+                            <div class="border rounded-3 p-3" style="min-width:220px;">
+                                <div class="text-muted">Possible Trips</div>
+                                <div class="fs-2 fw-bold">@Model.PossibleTripsCount</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (modeIsDate)
+                    {
+                        <div class="mt-2 small text-muted">
+                            Showing slots = <b>@maxSlots</b> (min(available buses, drivers)) for selected date: <b>@Model.CheckDate</b>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mt-2 small text-muted">
+                            Showing slots = <b>@maxSlots</b> (max(possible, saved templates)).
+                        </div>
+                    }
+                </div>
+
+                <hr class="my-4" />
+
+                <!-- ===================== Trips List ===================== -->
+                <div>
+                    <h5 class="fw-bold mb-1">Trips List</h5>
+                    <div class="text-muted small mb-3">Toggle Enabled then press Save.</div>
+
+                    @if (shownTemplates.Count == 0)
+                    {
+                        <div class="alert alert-light border">No templates to show.</div>
+                    }
+                    else
+                    {
+                        <div class="list-group">
+                            @for (int i = 0; i < shownTemplates.Count; i++)
+                            {
+                                var t = shownTemplates[i];
+
+                                <div class="list-group-item py-3"
+                                     data-template-row
+                                     data-order="@t.OrderNo"
+                                     data-bus-id="@(t.BusId?.ToString() ?? "")"
+                                     data-driver-id="@(t.DriverId?.ToString() ?? "")">
+
+                                    <!-- REQUIRED for POST binding -->
+                                    <input type="hidden" name="Templates[@i].Id" value="@t.Id" />
+                                    <input type="hidden" name="Templates[@i].OrderNo" value="@t.OrderNo" />
+
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <span class="badge bg-dark">#@t.OrderNo</span>
+                                            <div class="fw-semibold">@t.TripName</div>
+                                            <span class="badge bg-light text-dark border">@t.DepartTime</span>
+
+                                            @if (modeIsDate && t.IsEnabled && !t.IsAvailableForDate)
+                                            {
+                                                <span class="badge bg-danger">Unavailable</span>
+                                                @if (!string.IsNullOrWhiteSpace(t.UnavailableReason))
+                                                {
+                                                    <span class="small text-danger">@t.UnavailableReason</span>
+                                                }
+                                            }
+                                        </div>
+
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="form-check form-switch mb-0">
+                                                @* ✅ checkbox FIRST ثم hidden false AFTER (علشان الـ binder ياخد true لما تكون checked) *@
+                                                <input class="form-check-input tpl-enabled"
+                                                       type="checkbox"
+                                                       name="Templates[@i].IsEnabled"
+                                                       value="true"
+                                                       @(t.IsEnabled ? "checked" : "") />
+                                                <input type="hidden" name="Templates[@i].IsEnabled" value="false" />
+
+                                                <label class="form-check-label text-muted">Enabled</label>
+                                            </div>
+
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary btn-sm btn-move-up"
+                                                    data-orderno="@t.OrderNo"
+                                                    title="Move Up">
+                                                ↑
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary btn-sm btn-move-down"
+                                                    data-orderno="@t.OrderNo"
+                                                    title="Move Down">
+                                                ↓
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-outline-primary btn-sm btn-edit-trip"
+                                                    data-orderno="@t.OrderNo">
+                                                Edit
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-muted mt-2">@t.FromCity → @t.ToCity</div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="text-muted small mt-2">
+                            Slots shown = @maxSlots
+                        </div>
+                    }
+                </div>
+
+            </div> <!-- /autoPlanBody -->
+        </form>
+
+    </div>
+</div>

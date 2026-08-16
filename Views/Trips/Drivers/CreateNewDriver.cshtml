@@ -1,0 +1,766 @@
+﻿@model NoufirTours.Models.Trips.Drivers.DriverCreateModel
+@{
+    ViewData["Title"] = "Add New Driver";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+}
+
+<style nonce="@nonce">
+    :root {
+        --nt-surface: #ffffff;
+        --nt-surface-2: #f8fafc;
+        --nt-border: rgba(0,0,0,.10);
+        --nt-border-2: rgba(0,0,0,.14);
+        --nt-muted: rgba(0,0,0,.55);
+        --nt-muted-2: rgba(0,0,0,.65);
+        --nt-title: rgba(0,0,0,.88);
+        --nt-shadow: 0 10px 22px rgba(0,0,0,.08);
+        --nt-input-bg: #ffffff;
+        --nt-input-border: rgba(0,0,0,.14);
+        --nt-input-border-focus: rgba(13,110,253,.45);
+        --nt-input-text: rgba(0,0,0,.88);
+        --nt-placeholder: rgba(0,0,0,.45);
+        --nt-soft: rgba(13,110,253,.08);
+        --nt-soft-2: rgba(25,135,84,.08);
+        --nt-help: rgba(0,0,0,.55);
+    }
+
+    [data-bs-theme="dark"] {
+        --nt-surface: #1f2328;
+        --nt-surface-2: #15191e;
+        --nt-border: rgba(255,255,255,.12);
+        --nt-border-2: rgba(255,255,255,.18);
+        --nt-muted: rgba(255,255,255,.62);
+        --nt-muted-2: rgba(255,255,255,.72);
+        --nt-title: rgba(255,255,255,.92);
+        --nt-shadow: 0 10px 22px rgba(0,0,0,.35);
+        --nt-input-bg: #101418;
+        --nt-input-border: rgba(255,255,255,.18);
+        --nt-input-border-focus: rgba(13,110,253,.55);
+        --nt-input-text: rgba(255,255,255,.92);
+        --nt-placeholder: rgba(255,255,255,.45);
+        --nt-soft: rgba(13,110,253,.14);
+        --nt-soft-2: rgba(25,135,84,.14);
+        --nt-help: rgba(255,255,255,.60);
+    }
+
+    h2, h3, h4, h5 {
+        color: var(--nt-title);
+    }
+
+    .text-muted {
+        color: var(--nt-muted) !important;
+    }
+
+    .small.text-muted {
+        color: var(--nt-help) !important;
+    }
+
+    .card {
+        background: var(--nt-surface);
+        border: 1px solid var(--nt-border) !important;
+        box-shadow: var(--nt-shadow) !important;
+    }
+
+        .card .card-body {
+            color: var(--nt-input-text);
+        }
+
+    hr {
+        border-color: var(--nt-border) !important;
+        opacity: 1;
+    }
+
+    .bg-light {
+        background-color: var(--nt-surface-2) !important;
+        border-color: var(--nt-border) !important;
+    }
+
+    .border, .border-0, .border-top, .border-bottom, .border-start, .border-end {
+        border-color: var(--nt-border) !important;
+    }
+
+    .form-control, .form-select {
+        background-color: var(--nt-input-bg) !important;
+        color: var(--nt-input-text) !important;
+        border-color: var(--nt-input-border) !important;
+    }
+
+        .form-control::placeholder {
+            color: var(--nt-placeholder) !important;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--nt-input-border-focus) !important;
+            box-shadow: 0 0 0 .25rem rgba(13,110,253,.15) !important;
+        }
+
+    [data-bs-theme="dark"] .form-control:focus,
+    [data-bs-theme="dark"] .form-select:focus {
+        box-shadow: 0 0 0 .25rem rgba(13,110,253,.22) !important;
+    }
+
+    .form-floating > label {
+        color: var(--nt-muted) !important;
+    }
+
+    .form-floating > .form-control:focus ~ label,
+    .form-floating > .form-control:not(:placeholder-shown) ~ label,
+    .form-floating > .form-select ~ label {
+        color: var(--nt-muted-2) !important;
+    }
+
+    .input-group-text {
+        background-color: var(--nt-surface-2) !important;
+        color: var(--nt-input-text) !important;
+        border-color: var(--nt-input-border) !important;
+    }
+
+    .form-check-label {
+        color: var(--nt-input-text) !important;
+    }
+
+    #phonesList option {
+        background: var(--nt-surface) !important;
+        color: var(--nt-input-text) !important;
+    }
+
+        #phonesList option:disabled {
+            color: var(--nt-muted) !important;
+        }
+
+    .text-danger {
+        color: #dc3545 !important;
+    }
+
+    [data-bs-theme="dark"] .text-danger {
+        color: #ff6b6b !important;
+    }
+
+    .card-body.p-4 {
+        background: linear-gradient(135deg, var(--nt-soft), var(--nt-soft-2));
+    }
+
+    [data-bs-theme="dark"] .card-body.p-4 {
+        background: linear-gradient(135deg, rgba(13,110,253,.10), rgba(25,135,84,.10));
+    }
+
+    .card .card .card-body {
+        background: transparent !important;
+    }
+
+    .validation-summary-errors ul {
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0 fw-bold">Add New Driver</h2>
+        <div class="text-muted small">Create driver profile and phone numbers</div>
+    </div>
+
+    <a asp-action="Drivers" class="btn btn-outline-secondary" data-nt-no-loader>
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+        <form asp-action="CreateNewDriver"
+              method="post"
+              id="driverForm"
+              data-nt-no-loader>
+            @* ✅ يمنع اللودر العام لو بيدعمها *@
+
+            @Html.AntiForgeryToken()
+
+            <!-- ✅ Server-side summary -->
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <div class="row g-4">
+
+                <!-- Personal -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">Personal Information</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="FullName" class="form-control" placeholder="Full Name" />
+                        <label asp-for="FullName">Full Name</label>
+                    </div>
+                    <span asp-validation-for="FullName" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="NationalId"
+                               class="form-control"
+                               placeholder="National ID"
+                               inputmode="numeric"
+                               pattern="\d{14}"
+                               maxlength="14"
+                               autocomplete="off"
+                               aria-describedby="nationalIdHelp" />
+                        <label asp-for="NationalId">National ID</label>
+                    </div>
+
+                    <div id="nationalIdHelp" class="text-muted small mt-1">
+                        National ID must be exactly 14 digits.
+                    </div>
+
+                    <span asp-validation-for="NationalId" class="text-danger small"></span>
+                    <div class="text-danger small" id="nationalIdError" style="display:none;"></div>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-floating">
+                        <input asp-for="Address" class="form-control" placeholder="Address" />
+                        <label asp-for="Address">Address</label>
+                    </div>
+                    <span asp-validation-for="Address" class="text-danger small"></span>
+                </div>
+
+                <!-- License -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">License Information</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="LicenseNumber" class="form-control" placeholder="License Number" />
+                        <label asp-for="LicenseNumber">License Number</label>
+                    </div>
+                    <span asp-validation-for="LicenseNumber" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="LicenseExpiryDate" class="form-control" type="date" />
+                        <label asp-for="LicenseExpiryDate">License Expiry Date</label>
+                    </div>
+                    <span asp-validation-for="LicenseExpiryDate" class="text-danger small"></span>
+                </div>
+
+                <!-- Employment -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">Employment Information</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input asp-for="JoinedAtDate" class="form-control" type="date" />
+                        <label asp-for="JoinedAtDate">Joined Date</label>
+                    </div>
+                    <span asp-validation-for="JoinedAtDate" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 bg-light border h-100 d-flex align-items-center">
+                        <div class="form-check form-switch m-0">
+                            <input asp-for="IsActive" class="form-check-input" type="checkbox" role="switch" />
+                            <label class="form-check-label fw-bold" asp-for="IsActive">Active Driver</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">Additional Information</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-12">
+                    <div class="form-floating">
+                        <textarea asp-for="Notes" class="form-control" placeholder="Notes" style="height: 110px"></textarea>
+                        <label asp-for="Notes">Notes</label>
+                    </div>
+                    <span asp-validation-for="Notes" class="text-danger small"></span>
+                </div>
+
+                <!-- Phones -->
+                <div class="col-12">
+                    <h5 class="fw-bold mb-0">Phone Numbers</h5>
+                    <hr class="mt-2" />
+                </div>
+
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body p-3 p-md-4">
+                            <div class="row g-3">
+
+                                <!-- Editor -->
+                                <div class="col-lg-6">
+                                    <label class="form-label fw-bold">Phone Editor</label>
+
+                                    <div class="input-group">
+                                        <input id="phoneInput"
+                                               class="form-control"
+                                               placeholder="01xxxxxxxxx"
+                                               autocomplete="off"
+                                               inputmode="numeric" />
+
+                                        <div class="input-group-text">
+                                            <div class="form-check m-0">
+                                                <input id="primaryCheck" class="form-check-input" type="checkbox" />
+                                                <label class="form-check-label small" for="primaryCheck">Primary</label>
+                                            </div>
+                                        </div>
+
+                                        <button id="btnAddPhone" type="button" class="btn btn-primary" data-nt-no-loader>
+                                            <i class="bi bi-plus-lg"></i> Add
+                                        </button>
+                                    </div>
+
+                                    <div class="text-danger small mt-1" id="phoneError" style="display:none;"></div>
+
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button id="btnUpdatePhone" type="button" class="btn btn-outline-success w-100" data-nt-no-loader>
+                                            <i class="bi bi-pencil-square"></i> Update
+                                        </button>
+                                        <button id="btnDeletePhone" type="button" class="btn btn-outline-danger w-100" data-nt-no-loader>
+                                            <i class="bi bi-trash"></i> Delete
+                                        </button>
+                                        <button id="btnClearPhone" type="button" class="btn btn-outline-secondary w-100" data-nt-no-loader>
+                                            <i class="bi bi-eraser"></i> Clear
+                                        </button>
+                                    </div>
+
+                                    <div class="text-muted small mt-2">
+                                        Press <b>Enter</b> to add.
+                                    </div>
+                                </div>
+
+                                <!-- List -->
+                                <div class="col-lg-6">
+                                    <label class="form-label fw-bold">Phones List</label>
+                                    <div class="border rounded-3 p-2 bg-light">
+                                        <select id="phonesList" class="form-select border-0 bg-transparent" size="8"></select>
+                                    </div>
+                                    <div class="text-muted small mt-1">
+                                        Select a number to load it for editing.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ✅ Hidden inputs for ModelBinding -->
+                            <div id="phonesHidden"></div>
+
+                            <!-- ✅ Server-side error for Phones (because you use ModelState.AddModelError(nameof(vm.Phones), ...)) -->
+                            <div class="mt-2">
+                                <span asp-validation-for="Phones" class="text-danger small"></span>
+                            </div>
+
+                            <!-- ✅ show server-side non-field errors too -->
+                            <div class="text-danger small mt-2">
+                                @Html.ValidationSummary(excludePropertyErrors: true)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="col-12">
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="submit"
+                                class="btn btn-primary px-5"
+                                id="btnSaveDriver"
+                                data-nt-no-loader>
+                            @* ✅ يمنع اللودر العام لو بيدعمها *@
+                            <i class="bi bi-check-circle"></i> Save
+                        </button>
+                        <a asp-action="Drivers" class="btn btn-outline-secondary px-4" data-nt-no-loader>
+                            Cancel
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script nonce="@nonce">
+        (function () {
+
+            // =========================
+            // 1) لو الصفحة رجعت وفيها أخطاء سيرفر: اقفل أي Loader Overlay عالق
+            // =========================
+            window.addEventListener('load', () => {
+                const hasServerErrors =
+                    document.querySelector('.validation-summary-errors') ||
+                    document.querySelector('.field-validation-error') ||
+                    document.querySelector('.input-validation-error');
+
+                if (!hasServerErrors) return;
+
+                const overlays = [
+                    document.getElementById('ntLoader'),
+                    document.getElementById('loaderOverlay'),
+                    document.querySelector('.loader-overlay'),
+                    document.querySelector('.page-loader'),
+                    document.querySelector('.nt-loader')
+                ].filter(Boolean);
+
+                overlays.forEach(el => {
+                    el.style.display = 'none';
+                    el.classList.add('d-none');
+                    el.style.pointerEvents = 'none';
+                });
+
+                document.body.classList.remove('loading', 'is-loading', 'nt-loading');
+
+                // scroll لأول خطأ
+                const firstInvalid =
+                    document.querySelector('.input-validation-error') ||
+                    document.querySelector('.field-validation-error') ||
+                    document.querySelector('.validation-summary-errors');
+
+                if (firstInvalid) {
+                    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(() => {
+                        const inp = firstInvalid.closest('.col-md-6,.col-12')?.querySelector('input,textarea,select');
+                        inp?.focus();
+                    }, 250);
+                }
+            });
+
+            // =========================
+            // State
+            // =========================
+            window.phones = [];
+
+            const serverPhones = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                            (Model.Phones ?? new List<NoufirTours.Models.Trips.Drivers.DriverPhoneInputModel>())
+                                    .Select(p => new { phoneNumber = p.PhoneNumber, isPrimary = p.IsPrimary })
+                    ));
+
+        window.phones = serverPhones || [];
+
+            // =========================
+            // Helpers
+            // =========================
+            function normalizePhone(s) { return (s || '').trim().replace(/\s+/g, ''); }
+            function isValidEgyptianPhone(phone) { return /^01[0125][0-9]{8}$/.test(phone); }
+
+            function escapeHtml(str) {
+                if (str == null) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function normalizeNationalId(raw) { return (raw || '').replace(/\D/g, '').trim(); }
+            function isValidNationalId(nid) { return /^\d{14}$/.test(nid); }
+
+            function showPhoneError(msg) {
+                const el = document.getElementById('phoneError');
+                if (!el) return;
+                if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+                el.style.display = 'block';
+                el.textContent = msg;
+            }
+
+            function showNationalIdError(msg) {
+                const el = document.getElementById('nationalIdError');
+                if (!el) return;
+                if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+                el.style.display = 'block';
+                el.textContent = msg;
+            }
+
+            function ensureSinglePrimary() {
+                if (!window.phones.length) return;
+
+                const primCount = window.phones.filter(p => p.isPrimary).length;
+
+                if (primCount === 0) {
+                    window.phones[0].isPrimary = true;
+                    return;
+                }
+
+                if (primCount > 1) {
+                    let kept = false;
+                    window.phones.forEach(p => {
+                        if (p.isPrimary && !kept) { kept = true; return; }
+                        if (kept) p.isPrimary = false;
+                    });
+                }
+            }
+
+            // =========================
+            // UI render
+            // =========================
+            function refreshUI(keepSelectedIndex) {
+                const list = document.getElementById('phonesList');
+                const hidden = document.getElementById('phonesHidden');
+                if (!list || !hidden) return;
+
+                const prev = (typeof keepSelectedIndex === 'number') ? keepSelectedIndex : list.selectedIndex;
+
+                list.innerHTML = '';
+
+                if (!window.phones.length) {
+                    const opt = document.createElement('option');
+                    opt.textContent = 'No phones added yet';
+                    opt.disabled = true;
+                    opt.selected = true;
+                    list.appendChild(opt);
+                } else {
+                    window.phones.forEach((p, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = String(idx);
+                        opt.textContent = (p.isPrimary ? '★ ' : '') + p.phoneNumber;
+                        list.appendChild(opt);
+                    });
+
+                    if (prev >= 0 && prev < window.phones.length) list.selectedIndex = prev;
+                }
+
+                hidden.innerHTML = '';
+                window.phones.forEach((p, idx) => {
+                    hidden.insertAdjacentHTML('beforeend', `
+                        <input type="hidden" name="Phones[${idx}].PhoneNumber" value="${escapeHtml(p.phoneNumber)}" />
+                        <input type="hidden" name="Phones[${idx}].IsPrimary" value="${p.isPrimary}" />
+                    `);
+                });
+            }
+
+            function getSelectedIndex() {
+                const list = document.getElementById('phonesList');
+                if (!list) return null;
+                const opt = list.options[list.selectedIndex];
+                if (!opt || opt.disabled) return null;
+                const idx = parseInt(opt.value, 10);
+                return Number.isNaN(idx) ? null : idx;
+            }
+
+            function clearEditor(clearSelection) {
+                showPhoneError('');
+                const input = document.getElementById('phoneInput');
+                const primaryCheck = document.getElementById('primaryCheck');
+                const list = document.getElementById('phonesList');
+
+                if (input) input.value = '';
+                if (primaryCheck) primaryCheck.checked = false;
+                if (clearSelection && list) list.selectedIndex = -1;
+
+                input?.focus();
+            }
+
+            // =========================
+            // Actions
+            // =========================
+            function addPhone() {
+                showPhoneError('');
+                const input = document.getElementById('phoneInput');
+                const primaryCheck = document.getElementById('primaryCheck');
+                if (!input || !primaryCheck) return;
+
+                const phone = normalizePhone(input.value);
+
+                if (!phone) { showPhoneError('Please enter a phone number.'); input.focus(); return; }
+                if (!isValidEgyptianPhone(phone)) { showPhoneError('Invalid phone number format.'); input.focus(); return; }
+
+                const exists = window.phones.some(p => (p.phoneNumber || '').toLowerCase() === phone.toLowerCase());
+                if (exists) { showPhoneError('This phone already exists.'); input.focus(); return; }
+
+                const isPrimary = !!primaryCheck.checked;
+                if (isPrimary) window.phones.forEach(p => p.isPrimary = false);
+
+                window.phones.push({ phoneNumber: phone, isPrimary: isPrimary });
+
+                ensureSinglePrimary();
+                refreshUI(window.phones.length - 1);
+
+                input.value = '';
+                primaryCheck.checked = false;
+                input.focus();
+            }
+
+            function loadSelectedToEditor() {
+                showPhoneError('');
+                const idx = getSelectedIndex();
+                if (idx == null) return;
+
+                const input = document.getElementById('phoneInput');
+                const primaryCheck = document.getElementById('primaryCheck');
+
+                if (input) input.value = window.phones[idx].phoneNumber || '';
+                if (primaryCheck) primaryCheck.checked = !!window.phones[idx].isPrimary;
+            }
+
+            function updateSelected() {
+                showPhoneError('');
+                const idx = getSelectedIndex();
+                if (idx == null) { showPhoneError('Select a phone first.'); return; }
+
+                const input = document.getElementById('phoneInput');
+                const primaryCheck = document.getElementById('primaryCheck');
+
+                const phone = normalizePhone(input?.value);
+                const isPrimary = !!primaryCheck?.checked;
+
+                if (!phone) { showPhoneError('Phone cannot be empty.'); return; }
+                if (!isValidEgyptianPhone(phone)) { showPhoneError('Invalid phone number format.'); return; }
+
+                const exists = window.phones.some((p, i) => i !== idx && (p.phoneNumber || '').toLowerCase() === phone.toLowerCase());
+                if (exists) { showPhoneError('This phone already exists.'); return; }
+
+                window.phones[idx].phoneNumber = phone;
+
+                if (isPrimary) {
+                    window.phones.forEach(p => p.isPrimary = false);
+                    window.phones[idx].isPrimary = true;
+                } else {
+                    window.phones[idx].isPrimary = false;
+                }
+
+                ensureSinglePrimary();
+                refreshUI(idx);
+                clearEditor(false);
+            }
+
+            function deleteSelected() {
+                showPhoneError('');
+                const idx = getSelectedIndex();
+                if (idx == null) { showPhoneError('Select a phone first.'); return; }
+
+                window.phones.splice(idx, 1);
+                ensureSinglePrimary();
+                refreshUI(Math.min(idx, window.phones.length - 1));
+                clearEditor(true);
+            }
+
+            // =========================
+            // 2) FINAL SUBMIT SOLUTION:
+            // - prevent default ALWAYS
+            // - validate client-side (jquery unobtrusive + our rules)
+            // - if valid => native form.submit() (bypass loader listeners)
+            // =========================
+            function validateBeforeNativeSubmit(form) {
+                showPhoneError('');
+                showNationalIdError('');
+
+                // run unobtrusive validation (if available)
+                if (window.jQuery && window.jQuery.validator) {
+                    const $f = window.jQuery(form);
+                    // make sure unobtrusive is parsed
+                    if (window.jQuery.validator.unobtrusive) {
+                        try { window.jQuery.validator.unobtrusive.parse(form); } catch {}
+                    }
+                    if (!$f.valid()) {
+                        // scroll first invalid
+                        const firstInvalid = form.querySelector('.input-validation-error') ||
+                                             form.querySelector('.field-validation-error') ||
+                                             form.querySelector('.validation-summary-errors');
+                        firstInvalid?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return false;
+                    }
+                }
+
+                // National ID sanitize + validate
+                const nidInput = form.querySelector('input[name="NationalId"]');
+                if (nidInput) {
+                    const cleaned = normalizeNationalId(nidInput.value).slice(0, 14);
+                    nidInput.value = cleaned;
+
+                    if (!isValidNationalId(cleaned)) {
+                        showNationalIdError('National ID must be exactly 14 digits.');
+                        nidInput.focus();
+                        nidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return false;
+                    }
+                }
+
+                // Phones required
+                if (!window.phones || window.phones.length === 0) {
+                    showPhoneError('At least one phone is required.');
+                    document.getElementById('phoneInput')?.focus();
+                    document.getElementById('phoneError')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return false;
+                }
+
+                // ensure 1 primary + sync hidden inputs
+                ensureSinglePrimary();
+                refreshUI(getSelectedIndex() ?? -1);
+
+                return true;
+            }
+
+            function setSavingUI(isSaving) {
+                const btn = document.getElementById('btnSaveDriver');
+                if (!btn) return;
+
+                if (isSaving) {
+                    btn.disabled = true;
+                    btn.dataset._oldHtml = btn.innerHTML;
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...`;
+                } else {
+                    btn.disabled = false;
+                    if (btn.dataset._oldHtml) btn.innerHTML = btn.dataset._oldHtml;
+                }
+            }
+
+            // =========================
+            // Wire events
+            // =========================
+            document.addEventListener('DOMContentLoaded', () => {
+
+                refreshUI(-1);
+
+                // Phones
+                document.getElementById('btnAddPhone')?.addEventListener('click', addPhone);
+                document.getElementById('btnUpdatePhone')?.addEventListener('click', updateSelected);
+                document.getElementById('btnDeletePhone')?.addEventListener('click', deleteSelected);
+                document.getElementById('btnClearPhone')?.addEventListener('click', () => clearEditor(true));
+                document.getElementById('phonesList')?.addEventListener('change', loadSelectedToEditor);
+
+                document.getElementById('phoneInput')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); addPhone(); }
+                });
+
+                // National ID digits only
+                const nidInput = document.querySelector('input[name="NationalId"]');
+                nidInput?.addEventListener('input', () => {
+                    showNationalIdError('');
+                    const cleaned = normalizeNationalId(nidInput.value).slice(0, 14);
+                    if (nidInput.value !== cleaned) nidInput.value = cleaned;
+                });
+
+                const form = document.getElementById('driverForm');
+                if (!form) return;
+
+                form.addEventListener('submit', (e) => {
+                    // ✅ امنع أي submit طبيعي (وبالتالي امنع أي loader listener)
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+
+                    const ok = validateBeforeNativeSubmit(form);
+                    if (!ok) return false;
+
+                    // ✅ الآن فقط: نعمل native submit (يتجاهل submit handlers واللودر)
+                    setSavingUI(true);
+                    setTimeout(() => {
+                        try { form.submit(); } finally { /* leave button disabled */ }
+                    }, 0);
+
+                    return false;
+                }, true); // capture قوي
+
+            });
+
+        })();
+    </script>
+}

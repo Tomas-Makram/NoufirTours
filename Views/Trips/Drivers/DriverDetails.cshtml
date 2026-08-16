@@ -1,0 +1,431 @@
+﻿@model NoufirTours.Models.Trips.Drivers.DriverDetailsModel
+@{
+    ViewData["Title"] = "Driver Details";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+}
+
+<style nonce="@nonce">
+    /* =========================
+           NoufirTours - Light/Dark polish (NO markup changes)
+           Uses Bootstrap theme switch via [data-bs-theme="dark"]
+           ========================= */
+
+    :root {
+        --nt-surface: #ffffff;
+        --nt-surface-2: #f8fafc;
+        --nt-border: rgba(0,0,0,.10);
+        --nt-border-2: rgba(0,0,0,.14);
+        --nt-muted: rgba(0,0,0,.55);
+        --nt-muted-2: rgba(0,0,0,.65);
+        --nt-title: rgba(0,0,0,.88);
+        --nt-shadow: 0 10px 22px rgba(0,0,0,.08);
+        --nt-input-bg: #ffffff;
+        --nt-input-border: rgba(0,0,0,.14);
+        --nt-input-text: rgba(0,0,0,.88);
+        --nt-soft: rgba(13,110,253,.08);
+        --nt-soft-2: rgba(25,135,84,.08);
+        --nt-help: rgba(0,0,0,.55);
+        /* list-group */
+        --nt-list-bg: #ffffff;
+        --nt-list-hover: rgba(13,110,253,.06);
+        --nt-list-border: rgba(0,0,0,.10);
+    }
+
+    [data-bs-theme="dark"] {
+        --nt-surface: #1f2328;
+        --nt-surface-2: #15191e;
+        --nt-border: rgba(255,255,255,.12);
+        --nt-border-2: rgba(255,255,255,.18);
+        --nt-muted: rgba(255,255,255,.62);
+        --nt-muted-2: rgba(255,255,255,.72);
+        --nt-title: rgba(255,255,255,.92);
+        --nt-shadow: 0 10px 22px rgba(0,0,0,.35);
+        --nt-input-bg: #101418;
+        --nt-input-border: rgba(255,255,255,.18);
+        --nt-input-text: rgba(255,255,255,.92);
+        --nt-soft: rgba(13,110,253,.14);
+        --nt-soft-2: rgba(25,135,84,.14);
+        --nt-help: rgba(255,255,255,.60);
+        --nt-list-bg: #101418;
+        --nt-list-hover: rgba(13,110,253,.14);
+        --nt-list-border: rgba(255,255,255,.12);
+    }
+
+    /* Headings + helpers */
+    h2, h3, h4, h5, h6 {
+        color: var(--nt-title);
+    }
+
+    .text-muted {
+        color: var(--nt-muted) !important;
+    }
+
+    .small.text-muted {
+        color: var(--nt-help) !important;
+    }
+
+    hr {
+        border-color: var(--nt-border) !important;
+        opacity: 1;
+    }
+
+    /* Alerts: keep Bootstrap colors but make them fit dark */
+    [data-bs-theme="dark"] .alert-success {
+        background-color: rgba(25,135,84,.18) !important;
+        color: rgba(255,255,255,.92) !important;
+    }
+
+    [data-bs-theme="dark"] .alert-danger {
+        background-color: rgba(220,53,69,.18) !important;
+        color: rgba(255,255,255,.92) !important;
+    }
+
+    /* Cards */
+    .card {
+        background: var(--nt-surface);
+        border: 1px solid var(--nt-border) !important;
+        box-shadow: var(--nt-shadow) !important;
+    }
+
+        .card.shadow-sm {
+            box-shadow: var(--nt-shadow) !important;
+        }
+
+        .card.border-0 {
+            border-color: transparent !important;
+        }
+        /* keep your intent */
+        .card .card-body {
+            color: var(--nt-input-text);
+        }
+
+    /* .bg-light blocks inside the page */
+    .bg-light {
+        background-color: var(--nt-surface-2) !important;
+        border-color: var(--nt-border) !important;
+        color: var(--nt-input-text) !important;
+    }
+
+    /* Borders */
+    .border, .border-top, .border-bottom, .border-start, .border-end {
+        border-color: var(--nt-border) !important;
+    }
+
+    /* List group (phones + trips) */
+    .list-group {
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    .list-group-item {
+        background: var(--nt-list-bg) !important;
+        color: var(--nt-input-text) !important;
+        border-color: var(--nt-list-border) !important;
+    }
+
+        .list-group-item .text-muted {
+            color: var(--nt-muted) !important;
+        }
+
+    /* clickable list items */
+    .list-group-item-action {
+        transition: background-color .12s ease, transform .12s ease;
+    }
+
+        .list-group-item-action:hover,
+        .list-group-item-action:focus {
+            background: var(--nt-list-hover) !important;
+        }
+
+        .list-group-item-action:active {
+            transform: translateY(0);
+        }
+
+    /* Make icons match */
+    .bi {
+        color: inherit;
+    }
+
+    [data-bs-theme="dark"] .text-muted .bi {
+        color: var(--nt-muted) !important;
+    }
+
+    /* Optional: subtle header gradient (only for the two main card bodies with p-4) */
+    .card > .card-body.p-4 {
+        background: linear-gradient(135deg, var(--nt-soft), var(--nt-soft-2));
+        border-radius: 16px;
+    }
+
+    [data-bs-theme="dark"] .card > .card-body.p-4 {
+        background: linear-gradient(135deg, rgba(13,110,253,.10), rgba(25,135,84,.10));
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0 fw-bold">Driver Details</h2>
+        <div class="text-muted small">View full driver information</div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Drivers" data-nt-no-loader>
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+        <a class="btn btn-primary" asp-action="EditDriver" asp-route-id="@Model.Id" data-nt-no-loader>
+            <i class="bi bi-pencil-square"></i> Edit
+        </a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success border-0 shadow-sm">
+        <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger border-0 shadow-sm">
+        <i class="bi bi-x-circle me-2"></i>@TempData["Error"]
+    </div>
+}
+
+<div class="row g-3">
+    <!-- Main -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+
+                <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                    <div>
+                        <h4 class="fw-bold mb-1">@Model.FullName</h4>
+                        <div class="text-muted">
+                            <span class="me-2"><i class="bi bi-person-badge"></i></span>
+                            <span>@Model.NationalId</span>
+                        </div>
+                    </div>
+
+                    <div class="text-md-end">
+                        @if (Model.IsArchived)
+                        {
+                            <span class="badge rounded-pill bg-danger px-3 py-2">Deleted</span>
+                            <span class="badge rounded-pill bg-secondary px-3 py-2 ms-1">Inactive</span>
+                        }
+                        else if (Model.IsActive)
+                        {
+                            <span class="badge rounded-pill bg-success px-3 py-2">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge rounded-pill bg-warning text-dark px-3 py-2">Inactive</span>
+                        }
+                    </div>
+                </div>
+
+                <hr class="my-4" />
+
+                <!-- Details Grid -->
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3 bg-light border">
+                            <div class="text-muted small">Address</div>
+                            <div class="fw-semibold">@(!string.IsNullOrWhiteSpace(Model.Address) ? Model.Address : "-")</div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3 bg-light border">
+                            <div class="text-muted small">License Number</div>
+                            <div class="fw-semibold">@(!string.IsNullOrWhiteSpace(Model.LicenseNumber) ? Model.LicenseNumber : "-")</div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3 bg-light border">
+                            <div class="text-muted small">License Expiry</div>
+                            <div class="fw-semibold">@(Model.LicenseExpiryDate?.ToString("yyyy-MM-dd") ?? "-")</div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3 bg-light border">
+                            <div class="text-muted small">Joined Date</div>
+                            <div class="fw-semibold">@Model.JoinedAt.ToString("yyyy-MM-dd")</div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="p-3 rounded-3 bg-light border">
+                            <div class="text-muted small">Notes</div>
+                            <div class="fw-semibold" style="white-space:pre-wrap;">
+                                @(!string.IsNullOrWhiteSpace(Model.Notes) ? Model.Notes : "-")
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4" />
+
+                <!-- Phones -->
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h5 class="fw-bold mb-0">Phone Numbers</h5>
+                    <span class="text-muted small">@((Model.Phones?.Count ?? 0)) phone(s)</span>
+                </div>
+
+                @if (Model.Phones == null || !Model.Phones.Any())
+                {
+                    <div class="text-muted">No phone numbers.</div>
+                }
+                else
+                {
+                    <div class="list-group">
+                        @foreach (var p in Model.Phones)
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-telephone"></i>
+                                    <span class="fw-semibold">@p.phone</span>
+                                </div>
+
+                                @if (p.isPrimary)
+                                {
+                                    <span class="badge bg-primary">Primary</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Side actions -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3">Actions</h5>
+
+                @* لو Deleted => Restore فقط *@
+                @if (Model.IsArchived)
+                {
+                    <form asp-action="RestoreDriver" asp-route-id="@Model.Id" method="post" class="mb-2">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-success w-100"
+                                onclick="return confirm('Restore this driver?');"
+                                data-nt-no-loader>
+                            <i class="bi bi-arrow-counterclockwise"></i> Restore Driver
+                        </button>
+                    </form>
+
+                    <div class="text-muted small">
+                        Deleted drivers are always inactive. Restore to enable again.
+                    </div>
+                }
+                else
+                {
+                    @* Activate/Deactivate *@
+                    @if (Model.IsActive)
+                    {
+                        <form asp-action="DeactivateDriver" asp-route-id="@Model.Id" method="post" class="mb-2">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-warning w-100"
+                                    onclick="return confirm('Set this driver to Inactive?');"
+                                    data-nt-no-loader>
+                                <i class="bi bi-pause-circle"></i> Set Inactive
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form asp-action="ActivateDriver" asp-route-id="@Model.Id" method="post" class="mb-2">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-success w-100"
+                                    onclick="return confirm('Activate this driver?');"
+                                    data-nt-no-loader>
+                                <i class="bi bi-play-circle"></i> Set Active
+                            </button>
+                        </form>
+                    }
+
+                    <a class="btn btn-primary w-100 mb-2" asp-action="EditDriver" asp-route-id="@Model.Id" data-nt-no-loader>
+                        <i class="bi bi-pencil-square"></i> Edit Driver
+                    </a>
+
+                    @* Soft Delete explicit *@
+                    <form asp-action="DeleteDriver" asp-route-id="@Model.Id" method="post" class="mb-2">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-danger w-100"
+                                onclick="return confirm('Delete this driver?\n\nIf it has ANY trips, it will be Soft Deleted (Archived).\nIf it has NO trips, it will be deleted permanently.');"
+                                data-nt-no-loader>
+                            <i class="bi bi-exclamation-triangle"></i> Delete
+                        </button>
+                    </form>
+                }
+
+                <a class="btn btn-outline-secondary w-100" asp-action="Drivers" data-nt-no-loader>
+                    <i class="bi bi-arrow-left"></i> Back to List
+                </a>
+            </div>
+        </div>
+
+        <!-- ✅ Trips card تحت Actions -->
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        <h6 class="fw-bold mb-0">Driver Trips</h6>
+                        <div class="text-muted small">
+                            Total: <b>@Model.TripsTotal</b> —
+                            Upcoming: <b>@Model.TripsUpcoming</b> —
+                            Past: <b>@Model.TripsPast</b>
+                        </div>
+                    </div>
+                    <i class="bi bi-calendar3 fs-4 text-muted"></i>
+                </div>
+
+                @if (Model.Trips == null || !Model.Trips.Any())
+                {
+                    <div class="text-muted">No trips assigned.</div>
+                }
+                else
+                {
+                    <div class="list-group">
+                        @foreach (var t in Model.Trips)
+                        {
+                            var badgeClass = t.IsToday ? "bg-primary" : (t.IsUpcoming ? "bg-success" : "bg-secondary");
+                            var icon = t.IsToday ? "bi-clock" : (t.IsUpcoming ? "bi-arrow-up-right-circle" : "bi-check2-circle");
+
+                            <a asp-action="TripDetails" asp-route-id="@t.TripId"
+                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-start"
+                               data-nt-no-loader>
+                                <div class="me-2">
+                                    <div class="fw-semibold">
+                                        <i class="bi @icon me-1"></i>
+                                        @t.Title
+                                    </div>
+                                    <div class="text-muted small">
+                                        @if (t.DepartAtCairo.HasValue)
+                                        {
+                                            @t.DepartAtCairo.Value.ToString("yyyy-MM-dd HH:mm")
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </div>
+                                </div>
+
+                                <span class="badge @badgeClass rounded-pill">@t.StatusLabel</span>
+                            </a>
+                        }
+                    </div>
+
+                    <div class="text-muted small mt-2">
+                        Times shown in <b>Cairo</b>.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

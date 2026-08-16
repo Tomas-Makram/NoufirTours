@@ -1,0 +1,110 @@
+﻿@{
+    ViewData["Title"] = "Terms & Conditions";
+    var siteName = "NoufirTours";
+    var contactEmail = "support@noufirtours.com"; // عدّلها
+    var contactPhone = "01000000000"; // عدّلها
+}
+
+<div class="container py-4">
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-file-text fs-3 text-primary"></i>
+        <div>
+            <h3 class="mb-0">@ViewData["Title"]</h3>
+            <div class="text-muted small">Last updated: @DateTime.Today.ToString("yyyy-MM-dd")</div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <p class="text-muted">
+                These Terms & Conditions govern your use of <strong>@siteName</strong> website and services, including browsing trips, booking seats, and making payments.
+                By using the site, you agree to these terms.
+            </p>
+
+            <hr />
+
+            <h5>1) Accounts & Access</h5>
+            <ul class="mb-3">
+                <li>You are responsible for keeping your login credentials secure.</li>
+                <li>Do not share your password or allow unauthorized access to your account.</li>
+                <li>Staff/admin accounts may have additional permissions for managing bookings, trips, and collections.</li>
+            </ul>
+
+            <h5>2) Bookings</h5>
+            <ul class="mb-3">
+                <li>Bookings are subject to seat availability and trip scheduling.</li>
+                <li>When you create a booking, you must provide accurate customer information (name/phone) and select seats appropriately.</li>
+                <li>The system may track total amount, paid amount, and due amount for each booking.</li>
+            </ul>
+
+            <h5>3) Payments & Collections</h5>
+            <ul class="mb-3">
+                <li>Payment methods and collection records may be stored for operational and auditing purposes.</li>
+                <li>Staff/admin may record collections on behalf of customers as part of operational workflow.</li>
+                <li>Any disputes should be reported promptly for investigation.</li>
+            </ul>
+
+            <h5>4) Cancellations & Refunds (General Policy)</h5>
+            <p class="mb-2 text-muted">
+                Cancellation rules may vary by trip and company policy. In general:
+            </p>
+            <ul class="mb-3">
+                <li>Canceled bookings may be recorded with cancellation reason/notes if applicable.</li>
+                <li>Refund eligibility depends on timing, policy, and payment method.</li>
+                <li>Administrative fees may apply where permitted.</li>
+            </ul>
+
+            <h5>5) User Conduct</h5>
+            <ul class="mb-3">
+                <li>Do not use the platform for illegal activities, fraud, or abuse.</li>
+                <li>Do not attempt to disrupt the service, access restricted data, or exploit vulnerabilities.</li>
+                <li>We may suspend or terminate accounts that violate these rules.</li>
+            </ul>
+
+            <h5>6) Service Availability</h5>
+            <p class="mb-3 text-muted">
+                We aim to keep the service available, but we do not guarantee uninterrupted access.
+                We may perform maintenance or updates that temporarily affect availability.
+            </p>
+
+            <h5>7) Accuracy of Information</h5>
+            <p class="mb-3 text-muted">
+                Trip schedules, prices, and availability may change. We work to keep information accurate,
+                but errors may occur. If we discover an error, we may correct it and notify users where appropriate.
+            </p>
+
+            <h5>8) Limitation of Liability</h5>
+            <p class="mb-3 text-muted">
+                To the fullest extent permitted by law, @siteName is not liable for indirect, incidental, or consequential damages
+                arising from your use of the site or services. Our total liability, if any, is limited to amounts paid through the platform
+                for the affected booking (where applicable).
+            </p>
+
+            <h5>9) Intellectual Property</h5>
+            <p class="mb-3 text-muted">
+                Content, branding, and materials on this site belong to @siteName or its licensors.
+                You may not copy, reproduce, or redistribute content without permission.
+            </p>
+
+            <h5>10) Changes to Terms</h5>
+            <p class="mb-3 text-muted">
+                We may update these Terms from time to time. Updates will be posted on this page with an updated "Last updated" date.
+                Your continued use of the site means you accept the updated terms.
+            </p>
+
+            <h5>11) Governing Law</h5>
+            <p class="mb-3 text-muted">
+                These terms are governed by applicable local laws in the region where @siteName operates.
+            </p>
+
+            <h5>12) Contact</h5>
+            <div class="border rounded p-3 bg-light">
+                <div class="fw-semibold">@siteName Support</div>
+                <div class="text-muted small">Email: @contactEmail</div>
+                <div class="text-muted small">Phone: @contactPhone</div>
+            </div>
+
+        </div>
+    </div>
+</div>

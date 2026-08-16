@@ -1,0 +1,538 @@
+﻿@using System.Globalization
+@model NoufirTours.Models.Dashboard.DashboardIndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+    string V(string? s) => string.IsNullOrWhiteSpace(s) ? "" : s.Trim();
+}
+
+<style nonce="@nonce">
+    .dash-hero {
+        border-radius: 18px;
+        padding: 16px;
+        background: linear-gradient(135deg, rgba(13,110,253,.10), rgba(25,135,84,.08));
+        border: 1px solid rgba(13,110,253,.12);
+        overflow: hidden;
+    }
+
+    [data-bs-theme="dark"] .dash-hero {
+        border-color: rgba(255,255,255,.10);
+        background: linear-gradient(135deg, rgba(13,110,253,.18), rgba(25,135,84,.12));
+    }
+
+    .muted {
+        color: rgba(0,0,0,.6);
+    }
+
+    [data-bs-theme="dark"] .muted {
+        color: rgba(255,255,255,.65);
+    }
+
+    .filter-row {
+        width: 100%;
+        --bs-gutter-x: 1rem;
+        --bs-gutter-y: .75rem;
+    }
+
+    .date-input,
+    .company-input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .switch-stack {
+        width: 100%;
+        min-width: 0;
+        padding-top: 26px;
+    }
+
+    .switch-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .table thead th {
+        white-space: nowrap;
+    }
+
+    .btns-col {
+        min-width: 260px;
+    }
+
+    .btns-wrap {
+        width: 100%;
+        display: flex;
+        gap: .75rem;
+        justify-content: flex-end;
+        align-items: center;
+        padding-top: 26px;
+    }
+
+    .delete-preview-card {
+        border: 1px solid rgba(0,0,0,.08);
+        border-radius: 14px;
+        background: var(--bs-tertiary-bg);
+    }
+
+    .delete-preview-label {
+        font-size: .85rem;
+        opacity: .75;
+        margin-bottom: .15rem;
+    }
+
+    .delete-preview-value {
+        font-weight: 600;
+        word-break: break-word;
+    }
+
+    .delete-preview-section-title {
+        font-size: .95rem;
+        font-weight: 700;
+        margin-bottom: .5rem;
+    }
+
+    @@media (max-width: 991.98px) {
+        .btns-wrap {
+            justify-content: stretch;
+            padding-top: 0;
+        }
+
+            .btns-wrap > a,
+            .btns-wrap > button {
+                width: 100%;
+            }
+    }
+</style>
+
+<div class="container py-4">
+
+    @if (TempData["DashError"] != null)
+    {
+        <div class="alert alert-danger mb-3">@TempData["DashError"]</div>
+    }
+
+    @if (TempData["DashOk"] != null)
+    {
+        <div class="alert alert-success mb-3">@TempData["DashOk"]</div>
+    }
+
+    <div class="dash-hero mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h3 class="mb-1">Dashboard</h3>
+            </div>
+
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-secondary"
+                       target="_blank"
+                       rel="noopener"
+                       href="/Dashboard/ExportExcel?From=@V(Model.Filter.From)&To=@V(Model.Filter.To)&Company=@V(Model.Filter.Company)&AllBookings=@Model.Filter.AllBookings&IncludeArchivedTrips=@Model.Filter.IncludeArchivedTrips">
+                    Export Excel
+                </a>
+
+                <a class="btn btn-outline-dark"
+                       href="/Dashboard/DeletedTickets">
+                    Deleted Tickets
+                </a>
+
+                <button type="button"
+                        class="btn btn-outline-danger"
+                        data-bs-toggle="modal"
+                        data-bs-target="#DeleteTicketModal">
+                    Delete Ticket
+                </button>
+            </div>
+        </div>
+
+        <hr class="my-3" />
+
+        <form method="get" action="/Dashboard/Index">
+            <div class="row align-items-end filter-row">
+
+                <div class="col-12 col-lg-3">
+                    <label class="form-label mb-1">From</label>
+                    <input type="date" name="From" value="@V(Model.Filter.From)" class="form-control date-input" />
+                </div>
+
+                <div class="col-12 col-lg-3">
+                    <label class="form-label mb-1">To</label>
+                    <input type="date" name="To" value="@V(Model.Filter.To)" class="form-control date-input" />
+                </div>
+
+                <div class="col-12 col-lg-3">
+                    <div class="switch-stack">
+                        <div class="switch-line mb-2">
+                            <label class="form-label mb-0">All bookings</label>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" name="AllBookings" value="true" @(Model.Filter.AllBookings ? "checked" : "") />
+                            </div>
+                        </div>
+                        <div class="switch-line">
+                            <label class="form-label mb-0">Include archived trips</label>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" name="IncludeArchivedTrips" value="true" @(Model.Filter.IncludeArchivedTrips ? "checked" : "") />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (Model.IsAdmin)
+                {
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label mb-1">Company (Admin)</label>
+                        <input type="text"
+                               name="Company"
+                               value="@V(Model.Filter.Company)"
+                               class="form-control company-input"
+                               placeholder="Type company / username..." />
+                    </div>
+                }
+
+                <div class="col-12 col-lg-3 btns-col">
+                    <div class="btns-wrap">
+                        <a class="btn btn-outline-secondary btn-sm px-4" href="/Dashboard/Index">Reset</a>
+                        <button class="btn btn-primary btn-sm px-4" type="submit">Apply</button>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </div>
+
+    @if (Model.Trips == null || Model.Trips.Count == 0)
+    {
+        <div class="alert alert-info mb-0">
+            No trips found with bookings for the selected filters.
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                @if(Model.IsAdmin)
+                                {
+                                    <th style="width: 220px;">Trip Name</th>
+                                }
+                                else
+                                {
+                                    <th>Client Name</th>
+                                }
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Route</th>
+                                <th>Bookings</th>
+                                <th>Seats</th>
+                                <th>Paid</th>
+                                <th>Total</th>
+                                @if (Model.IsAdmin)
+                                {
+                                    <th>Companies</th>
+                                }
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in Model.Trips)
+                            {
+                                <tr class="@(t.IsArchived ? "table-secondary" : "")">
+                                    <td class="fw-semibold">
+                                        @if(Model.IsAdmin)
+                                        {
+                                            @t.TripName
+                                        }
+                                        else
+                                        {
+                                            @t.ClientName
+                                        }
+                                        @if (t.IsArchived)
+                                        {
+                                            <span class="badge bg-secondary ms-2">Archived</span>
+                                        }
+                                    </td>
+                                    <td>@t.DepartDate</td>
+                                    <td>@t.DepartTime</td>
+                                    <td>
+                                        <span>@(t.FromCity ?? "-")</span>
+                                        <span class="mx-1">→</span>
+                                        <span>@(t.ToCity ?? "-")</span>
+                                    </td>
+                                    <td class="fw-bold">@t.BookingsCount</td>
+                                    <td>@t.SeatsCount</td>
+                                    <td>@t.TotalPaid.ToString("0.##", CultureInfo.InvariantCulture)</td>
+                                    <td>@t.TotalDue.ToString("0.##", CultureInfo.InvariantCulture)</td>
+
+                                    @if (Model.IsAdmin)
+                                    {
+                                        <td>
+                                            @if (t.Companies != null && t.Companies.Count > 0)
+                                            {
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @foreach (var c in t.Companies.Take(5))
+                                                    {
+                                                        <span class="badge text-bg-info">@c</span>
+                                                    }
+                                                    @if (t.Companies.Count > 5)
+                                                    {
+                                                        <span class="badge text-bg-secondary">+@(t.Companies.Count - 5)</span>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="muted">-</span>
+                                            }
+                                        </td>
+                                    }
+
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-primary"
+                                               href="/Dashboard/TripDetails/@t.TripId?company=@V(Model.Filter.Company)">
+                                            Details
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="modal fade" id="DeleteTicketModal" tabindex="-1" aria-labelledby="DeleteTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title" id="DeleteTicketModalLabel">Delete Ticket by Code</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form method="post"
+                  id="DeleteTicketForm"
+                  action="/Dashboard/DeleteTicketByCode?From=@V(Model.Filter.From)&To=@V(Model.Filter.To)&Company=@V(Model.Filter.Company)&AllBookings=@Model.Filter.AllBookings&IncludeArchivedTrips=@Model.Filter.IncludeArchivedTrips">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-body">
+                    <div class="mb-2 text-muted" style="font-size:.9rem;">
+                        Allowed only <b>before trip by 1 day</b>.
+                    </div>
+
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-8">
+                            <label class="form-label">Ticket Code</label>
+                            <input id="DeleteTicketCodeInput"
+                                   name="code"
+                                   class="form-control"
+                                   autocomplete="off"
+                                   placeholder="e.g. A2K9M3QZ"
+                                   required />
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" id="PreviewDeleteBtn" class="btn btn-outline-primary w-100">
+                                Preview
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="DeletePreviewAlert" class="mt-3"></div>
+                    <div id="DeletePreviewBox" class="mt-3 d-none"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="ConfirmDeleteBtn" class="btn btn-danger d-none">Confirm Delete</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<script nonce="@nonce">
+    (function () {
+        var modalEl = document.getElementById('DeleteTicketModal');
+        var form = document.getElementById('DeleteTicketForm');
+        var input = document.getElementById('DeleteTicketCodeInput');
+        var previewBtn = document.getElementById('PreviewDeleteBtn');
+        var confirmBtn = document.getElementById('ConfirmDeleteBtn');
+        var previewBox = document.getElementById('DeletePreviewBox');
+        var alertBox = document.getElementById('DeletePreviewAlert');
+
+        if (!modalEl || !form || !input || !previewBtn || !confirmBtn || !previewBox || !alertBox) return;
+
+        function esc(s) {
+            if (s == null) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function showAlert(msg, type) {
+            alertBox.innerHTML = '<div class="alert alert-' + type + ' mb-0">' + esc(msg) + '</div>';
+        }
+
+        function clearPreview() {
+            alertBox.innerHTML = '';
+            previewBox.innerHTML = '';
+            previewBox.classList.add('d-none');
+            confirmBtn.classList.add('d-none');
+            confirmBtn.disabled = true;
+        }
+
+        function renderField(label, value) {
+            return '' +
+                '<div class="col-md-6">' +
+                '   <div class="delete-preview-label">' + esc(label) + '</div>' +
+                '   <div class="delete-preview-value">' + esc(value || '-') + '</div>' +
+                '</div>';
+        }
+
+        function renderPreview(x) {
+            var html = '';
+
+            html += '<div class="delete-preview-card p-3">';
+            html += '  <div class="row g-3">';
+
+            html += renderField('Code', x.code);
+            html += renderField('Type', x.bookingType);
+
+            html += renderField('Customer', x.customerName);
+            html += renderField('Phone', x.phone);
+
+            html += renderField('Company', x.companyFrom);
+            html += renderField('Total',(x.totalAmount ?? '-'));
+
+            html += '    <div class="col-12"><hr class="my-1"></div>';
+            html += '    <div class="col-12"><div class="delete-preview-section-title">Main Trip</div></div>';
+
+            html += renderField('Trip', x.mainTripName);
+            html += renderField('Date', x.mainTripDate);
+            html += renderField('Time', x.mainTripTime);
+            html += renderField('Route', x.mainRoute);
+
+            html += '    <div class="col-md-12">';
+            html += '       <div class="delete-preview-label">Main Seats</div>';
+            html += '       <div class="delete-preview-value">' + esc(x.mainSeats || '-') + '</div>';
+            html += '    </div>';
+
+            if (x.returnTripName) {
+                html += '    <div class="col-12"><hr class="my-1"></div>';
+                html += '    <div class="col-12"><div class="delete-preview-section-title">Return Trip</div></div>';
+
+                html += renderField('Trip', x.returnTripName);
+                html += renderField('Date', x.returnTripDate);
+                html += renderField('Time', x.returnTripTime);
+                html += renderField('Route', x.returnRoute);
+
+                html += '    <div class="col-md-12">';
+                html += '       <div class="delete-preview-label">Return Seats</div>';
+                html += '       <div class="delete-preview-value">' + esc(x.returnSeats || '-') + '</div>';
+                html += '    </div>';
+            }
+
+            html += '    <div class="col-12"><hr class="my-1"></div>';
+            html += renderField('Delete Deadline', x.deleteDeadlineText);
+            html += renderField('Notes', x.notes);
+
+            html += '  </div>';
+            html += '</div>';
+
+            previewBox.innerHTML = html;
+            previewBox.classList.remove('d-none');
+        }
+
+        modalEl.addEventListener('shown.bs.modal', function () {
+            clearPreview();
+            input.value = '';
+            input.focus();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            clearPreview();
+            input.value = '';
+            previewBtn.disabled = false;
+            previewBtn.innerText = 'Preview';
+        });
+
+        input.addEventListener('input', function () {
+            clearPreview();
+        });
+
+        previewBtn.addEventListener('click', async function () {
+            clearPreview();
+
+            var code = (input.value || '').trim();
+            if (!code) {
+                showAlert('Please enter the ticket code.', 'warning');
+                input.focus();
+                return;
+            }
+
+            previewBtn.disabled = true;
+            previewBtn.innerText = 'Loading...';
+
+            try {
+                var url = '/Dashboard/PreviewDeleteTicket?code=' + encodeURIComponent(code);
+                var res = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!res.ok) {
+                    showAlert('Failed to load ticket preview.', 'danger');
+                    return;
+                }
+
+                var data = await res.json();
+
+                if (!data.found) {
+                    showAlert(data.errorMessage || 'Ticket not found.', 'danger');
+                    return;
+                }
+
+                renderPreview(data);
+
+                if (data.canDelete) {
+                    showAlert('Please review ticket details before confirming delete.', 'info');
+                    confirmBtn.classList.remove('d-none');
+                    confirmBtn.disabled = false;
+                } else {
+                    showAlert(data.errorMessage || 'Delete not allowed.', 'danger');
+                    confirmBtn.classList.add('d-none');
+                    confirmBtn.disabled = true;
+                }
+            } catch (e) {
+                showAlert('Unexpected error while loading preview.', 'danger');
+            } finally {
+                previewBtn.disabled = false;
+                previewBtn.innerText = 'Preview';
+            }
+        });
+
+        form.addEventListener('submit', function (e) {
+            var isVisible = !confirmBtn.classList.contains('d-none');
+            var isEnabled = !confirmBtn.disabled;
+            var code = (input.value || '').trim();
+
+            if (!isVisible || !isEnabled || !code) {
+                e.preventDefault();
+                showAlert('Please preview the ticket details first before deleting.', 'warning');
+                return false;
+            }
+        });
+    })();
+</script>

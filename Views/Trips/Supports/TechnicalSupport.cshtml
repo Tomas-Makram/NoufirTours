@@ -1,0 +1,112 @@
+﻿@using System.Globalization
+@model NoufirTours.Data.TechnicalSupport
+
+@{
+    ViewData["Title"] = "Technical Support";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+    string V(string? s) => string.IsNullOrWhiteSpace(s) ? "" : s.Trim();
+
+    string updatedAt = Model.UpdatedAtUnix > 0
+        ? DateTimeOffset.FromUnixTimeSeconds(Model.UpdatedAtUnix).ToLocalTime().ToString("yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture)
+        : "-";
+}
+
+<style nonce="@nonce">
+    :root {
+        --bg: #f6f8fc;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #64748b;
+        --border: rgba(15,23,42,.12);
+        --shadow: rgba(2,6,23,.12);
+        --input-bg: #fff;
+        --input-border: rgba(15,23,42,.18);
+        --focus: rgba(37,99,235,.25);
+    }
+
+    [data-bs-theme="dark"] {
+        --bg: #0b1020;
+        --card: #111a2f;
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --border: rgba(148,163,184,.18);
+        --shadow: rgba(0,0,0,.45);
+        --input-bg: #0f172a;
+        --input-border: rgba(148,163,184,.28);
+        --focus: rgba(96,165,250,.25);
+    }
+
+    body {
+        background: var(--bg) !important;
+        color: var(--text) !important;
+    }
+
+    .cardx {
+        background: var(--card);
+        border: 1px solid var(--border);
+        box-shadow: 0 .6rem 1.4rem var(--shadow);
+        border-radius: 18px;
+    }
+
+    .muted {
+        color: var(--muted);
+    }
+
+    .form-control {
+        background: var(--input-bg) !important;
+        border-color: var(--input-border) !important;
+        color: var(--text) !important;
+    }
+
+        .form-control:focus {
+            box-shadow: 0 0 0 .25rem var(--focus) !important;
+        }
+</style>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="mb-0">Technical Support</h3>
+            <div class="muted small">Manage company & complaints numbers</div>
+        </div>
+        <a class="btn btn-outline-secondary" href="@Url.Action("Index", "Home")">
+            <i class="bi bi-house me-1"></i> Home
+        </a>
+    </div>
+
+    @if (TempData["Ok"] != null)
+    {
+        <div class="alert alert-success">@TempData["Ok"]</div>
+    }
+
+    <div class="cardx p-3 p-md-4">
+        <form method="post" asp-action="TecSup" asp-controller="Trips">
+            @Html.AntiForgeryToken()
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Company Phone</label>
+                    <input class="form-control" name="companyPhone" value="@V(Model.CompanyPhone)" placeholder="e.g. 01234567890" />
+                    <div class="muted small mt-1">Shown as the main company contact number.</div>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Complaints Phone</label>
+                    <input class="form-control" name="complaintsPhone" value="@V(Model.ComplaintsPhone)" placeholder="e.g. 01000000000" />
+                    <div class="muted small mt-1">Used for complaints & issues.</div>
+                </div>
+
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+                        <div class="muted small">
+                            Last update: <span class="fw-semibold">@updatedAt</span>
+                        </div>
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-save me-1"></i> Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

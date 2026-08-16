@@ -1,0 +1,295 @@
+﻿@model NoufirTours.Models.Trips.Accounts.UserFinanceModal
+
+@{
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+    var tab = (ViewData["FinanceTab"]?.ToString() ?? "bookings").ToLowerInvariant();
+    var isBookings = tab == "bookings";
+    var isCollections = tab == "collections";
+}
+
+<div class="modal-header">
+    <div class="d-flex flex-column">
+        <h5 class="modal-title mb-0">Finance Details — @Model.Username</h5>
+        <div class="text-muted small">Bookings & Collections</div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+
+<div class="modal-body" data-user-id="@Model.UserId" data-tab="@tab">
+
+    <!-- Summary -->
+    <!-- Summary -->
+    <div class="row justify-content-center g-4 mb-3">
+        <div class="col-12 col-sm-10 col-md-4 col-lg-3">
+            <div class="border border-warning rounded-3 p-3 bg-warning-subtle h-100">
+                <div class="text-muted small">Total Due</div>
+                <div class="fw-bold fs-4">@Model.TotalDue.ToString("0.##")</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-10 col-md-4 col-lg-3">
+            <div class="border border-success rounded-3 p-3 bg-success-subtle h-100">
+                <div class="text-muted small">Total Paid</div>
+                <div class="fw-bold fs-4">@Model.TotalPaid.ToString("0.##")</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-10 col-md-4 col-lg-3">
+            <div class="border border-danger rounded-3 p-3 bg-danger-subtle h-100">
+                <div class="text-muted small">Remaining</div>
+                <div class="fw-bold fs-4">@Model.Remaining.ToString("0.##")</div>
+            </div>
+        </div>
+    </div>
+    <!-- Payment (Amount/Method فقط) -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="fw-semibold mb-2">Add Collection (to Booking)</div>
+
+            <form method="post" asp-action="AddBookingCollection" asp-controller="Trips">
+                @Html.AntiForgeryToken()
+
+                <input type="hidden" name="BookingId" value="@(Model.TargetBookingId ?? Guid.Empty)" />
+
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Amount</label>
+                        <input name="Amount" type="number" step="0.01" class="form-control" required />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Method</label>
+                        <input name="Method" class="form-control" required placeholder="cash / vodafone..." />
+                    </div>
+
+                    <div class="col-12">
+                        <button class="btn btn-primary w-100">
+                            <i class="bi bi-save me-1"></i> Save Now
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lists -->
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-semibold">Bookings</div>
+                        <div class="text-muted small">Count: <b>@Model.Bookings.Count</b></div>
+                    </div>
+
+                    @if (Model.Bookings.Count == 0)
+                    {
+                        <div class="text-muted small">No bookings.</div>
+                    }
+                    else
+                    {
+                        <div class="list-group">
+                            @foreach (var b in Model.Bookings)
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-w-0">
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (b.IsCanceled)
+                                            {
+                                                <span class="badge bg-danger">Canceled</span>
+                                            }
+                                            else
+                                            {
+
+                                                <span class="badge bg-success">Booked</span>
+                                            }
+
+                                            <div class="fw-semibold text-truncate">@b.CustomerName</div>
+                                        </div>
+                                        <div class="text-muted small text-truncate">
+                                            • @b.Phone • @b.CairoTime.ToString("yyyy-MM-dd HH:mm")
+                                        </div>
+                                    </div>
+
+                                    <div class="text-end" style="white-space:nowrap;">
+                                        <div class="small text-muted">Total</div>
+                                        <div class="fw-semibold">@b.TotalAmount.ToString("0.##")</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-semibold">Collections</div>
+                        <div class="text-muted small">Count: <b>@Model.Collections.Count</b></div>
+                    </div>
+
+                    @if (Model.Collections.Count == 0)
+                    {
+                        <div class="text-muted small">No collections yet.</div>
+                    }
+                    else
+                    {
+                        <div class="list-group mb-3">
+                            @foreach (var c in Model.Collections)
+                            {
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="min-w-0">
+                                            <div class="fw-semibold">@c.Amount.ToString("0.##")</div>
+                                            <div class="text-muted small text-truncate">
+                                                @c.CairoTime.ToString("yyyy-MM-dd HH:mm") • @(string.IsNullOrWhiteSpace(c.Method) ? "-" : c.Method)
+                                            </div>
+                                            <div class="text-muted small">By: @c.CreatedBy</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+</div>
+
+<script nonce="@nonce">
+    (function () {
+
+        // ✅ re-run scripts after replacing modal HTML
+        function replaceModalHtmlAndRunScripts(modalContent, html) {
+            modalContent.innerHTML = html;
+
+            // Important: scripts inserted via innerHTML won't execute => re-create them
+            const scripts = Array.from(modalContent.querySelectorAll("script"));
+            scripts.forEach(oldScript => {
+                const newScript = document.createElement("script");
+
+                // keep nonce
+                const n = oldScript.getAttribute("nonce");
+                if (n) newScript.setAttribute("nonce", n);
+
+                // keep src if exists (not expected here, but safe)
+                if (oldScript.src) newScript.src = oldScript.src;
+
+                newScript.text = oldScript.text || oldScript.textContent || "";
+
+                // remove old then append new to execute
+                oldScript.parentNode.removeChild(oldScript);
+                modalContent.appendChild(newScript);
+            });
+        }
+
+        const modalContent = document.currentScript.closest('.modal-content') || document;
+        const body = modalContent.querySelector('.modal-body');
+        if (!body) return;
+
+        const userId = body.getAttribute('data-user-id');
+
+        function getCurrentTabFromDom() {
+            const t = (modalContent.querySelector('.modal-body')?.getAttribute('data-tab') || 'bookings').toLowerCase();
+            return (t === 'collections') ? 'collections' : 'bookings';
+        }
+
+        function showTab(tab) {
+            const bookingsPanel = modalContent.querySelector("#bookingsFilterPanel");
+            const collectionsPanel = modalContent.querySelector("#collectionsFilterPanel");
+            const tabBookings = modalContent.querySelector("#tabBookings");
+            const tabCollections = modalContent.querySelector("#tabCollections");
+
+            // set tab attribute so it is preserved in DOM
+            const b = modalContent.querySelector('.modal-body');
+            if (b) b.setAttribute('data-tab', tab);
+
+            if (tab === 'collections') {
+                collectionsPanel && collectionsPanel.classList.remove("d-none");
+                bookingsPanel && bookingsPanel.classList.add("d-none");
+                if (tabCollections) tabCollections.checked = true;
+            } else {
+                bookingsPanel && bookingsPanel.classList.remove("d-none");
+                collectionsPanel && collectionsPanel.classList.add("d-none");
+                if (tabBookings) tabBookings.checked = true;
+            }
+        }
+
+        async function reloadWithFilters(reset) {
+            const currentTab = getCurrentTabFromDom();
+
+            const url = new URL(window.location.origin + '/Trips/UserFinanceModal');
+            url.searchParams.set('id', userId);
+            url.searchParams.set('tab', currentTab);
+
+            if (currentTab === 'bookings') {
+                const bFrom = modalContent.querySelector("#bFrom")?.value || "";
+                const bTo = modalContent.querySelector("#bTo")?.value || "";
+                const bSearch = modalContent.querySelector("#bSearch")?.value || "";
+                const bStatus = modalContent.querySelector("#bStatus")?.value || "";
+
+                if (!reset) {
+                    if (bFrom) url.searchParams.set('bFrom', bFrom);
+                    if (bTo) url.searchParams.set('bTo', bTo);
+                    if (bSearch) url.searchParams.set('bSearch', bSearch);
+                    if (bStatus) url.searchParams.set('bStatus', bStatus);
+                }
+            } else {
+                const cFrom = modalContent.querySelector("#cFrom")?.value || "";
+                const cTo = modalContent.querySelector("#cTo")?.value || "";
+                const cSearch = modalContent.querySelector("#cSearch")?.value || "";
+
+                if (!reset) {
+                    if (cFrom) url.searchParams.set('cFrom', cFrom);
+                    if (cTo) url.searchParams.set('cTo', cTo);
+                    if (cSearch) url.searchParams.set('cMethod', cSearch);
+                }
+            }
+
+            const res = await fetch(url.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+
+            const html = await res.text();
+
+            // ✅ replace + execute scripts so filter keeps working
+            replaceModalHtmlAndRunScripts(modalContent, html);
+        }
+
+        // ✅ bind events (works initially, and after reload because scripts re-run)
+        const tabBookings = modalContent.querySelector("#tabBookings");
+        const tabCollections = modalContent.querySelector("#tabCollections");
+
+        const btnReload1 = modalContent.querySelector("#btnReloadFinance");
+        const btnReset1 = modalContent.querySelector("#btnResetFinance");
+        const btnReload2 = modalContent.querySelector("#btnReloadFinance2");
+        const btnReset2 = modalContent.querySelector("#btnResetFinance2");
+
+        tabBookings && tabBookings.addEventListener("change", function () {
+            if (tabBookings.checked) showTab('bookings');
+        });
+
+        tabCollections && tabCollections.addEventListener("change", function () {
+            if (tabCollections.checked) showTab('collections');
+        });
+
+        btnReload1 && btnReload1.addEventListener("click", function () { reloadWithFilters(false); });
+        btnReload2 && btnReload2.addEventListener("click", function () { reloadWithFilters(false); });
+
+        btnReset1 && btnReset1.addEventListener("click", function () { reloadWithFilters(true); });
+        btnReset2 && btnReset2.addEventListener("click", function () { reloadWithFilters(true); });
+
+        // initial state from DOM
+        showTab(getCurrentTabFromDom());
+
+    })();
+</script>

@@ -1,0 +1,121 @@
+﻿@model NoufirTours.Models.Trips.Trips.DriverModalDetailsModel
+
+@{
+    // ✅ Error short-circuit
+    if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger mb-0">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            @Model.ErrorMessage
+        </div>
+        return;
+    }
+
+    string Safe(string? v) => string.IsNullOrWhiteSpace(v) ? "-" : v;
+}
+
+<div class="row g-3">
+
+    <!-- LEFT: Phones + Notes -->
+    <div class="col-lg-5">
+
+        <!-- PHONES -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-telephone"></i> Phones
+            </div>
+
+            <div class="card-body">
+                @if (Model.Phones == null || Model.Phones.Count == 0)
+                {
+                    <div class="text-muted">No phones.</div>
+                }
+                else
+                {
+                    <ul class="mb-0">
+                        @foreach (var p in Model.Phones)
+                        {
+                            <li class="mb-1">
+                                @p.PhoneNumber
+                                @if (p.IsPrimary)
+                                {
+                                    <span class="badge bg-success ms-2">Primary</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+
+        <!-- NOTES -->
+        <div class="card shadow-sm">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-journal-text"></i> Notes
+            </div>
+
+            <div class="card-body">
+                <div class="text-muted" style="white-space:pre-wrap;">
+                    @(string.IsNullOrWhiteSpace(Model.Notes) ? "-" : Model.Notes)
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RIGHT: Basic Info + Active + Joined At -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+
+            <!-- Header: Basic Info + Active badge -->
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">
+                    <i class="bi bi-person-badge"></i> Basic Info
+                </span>
+
+                <span class="badge rounded-pill @(Model.IsActive ? "text-bg-success" : "text-bg-danger")">
+                    <i class="bi @(Model.IsActive ? "bi-check-circle-fill" : "bi-x-circle-fill") me-1"></i>
+                    @(Model.IsActive ? "Active" : "Inactive")
+                </span>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <div class="text-muted small">Name</div>
+                        <div class="fw-semibold">@Model.FullName</div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="text-muted small">National ID</div>
+                        <div class="fw-semibold">@Model.NationalId</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small">Address</div>
+                        <div class="fw-semibold">@Safe(Model.Address)</div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="text-muted small">License Number</div>
+                        <div class="fw-semibold">@Safe(Model.LicenseNumber)</div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="text-muted small">License Expiry</div>
+                        <div class="fw-semibold">@((Model.LicenseExpiryDate?.ToString("yyyy-MM-dd")) ?? "-")</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small">Joined At</div>
+                        <div class="fw-semibold">@Model.JoinedAt.ToString("yyyy-MM-dd")</div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>

@@ -1,0 +1,472 @@
+﻿@model NoufirTours.Models.Trips.Accounts.UserDetailsModel
+@{
+    ViewData["Title"] = "User Details";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+}
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="mb-0">User Details</h3>
+            <div class="text-muted small">Monitor & control account</div>
+        </div>
+        <a asp-action="Accounts" asp-controller="Trips" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success d-flex align-items-center gap-2" role="alert">
+            <i class="bi bi-check-circle-fill"></i>
+            <div>@TempData["Success"]</div>
+        </div>
+    }
+
+    <div class="row g-3">
+
+        <!-- LEFT -->
+        <div class="col-lg-4">
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="min-w-0">
+                            <h5 class="mb-1 text-truncate">@Model.Username</h5>
+                            <div class="text-muted small text-truncate">@Model.RoleText</div>
+                        </div>
+
+                        @if (Model.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">Inactive</span>
+                        }
+                    </div>
+
+                    <hr class="my-3" />
+
+                    <div class="small">
+                        <div class="d-flex justify-content-between gap-2 py-1">
+                            <div class="text-muted">Full Name</div>
+                            <div class="text-end fw-semibold">
+                                @(string.IsNullOrWhiteSpace(Model.FullName) ? "-" : Model.FullName)
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between gap-2 py-1">
+                            <div class="text-muted">Phone</div>
+                            <div class="text-end fw-semibold">
+                                @(string.IsNullOrWhiteSpace(Model.Phone) ? "-" : Model.Phone)
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between gap-2 py-1">
+                            <div class="text-muted">Last Login (Cairo)</div>
+                            <div class="text-end fw-semibold">
+                                @(Model.LastLoginCairo.HasValue? Model.LastLoginCairo.Value.ToString("yyyy-MM-dd HH:mm") : "-")
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3" />
+
+                    <form method="post" asp-action="UserToggleActive" asp-controller="Trips" asp-route-id="@Model.UserID">
+                        @Html.AntiForgeryToken()
+                        <button class="btn @(Model.IsActive ? "btn-outline-danger" : "btn-outline-success") w-100">
+                            <i class="bi @(Model.IsActive ? "bi-person-x" : "bi-person-check") me-1"></i>
+                            @(Model.IsActive ? "Deactivate Account" : "Activate Account")
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Activity Stats -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h6 class="mb-0">Activity Stats</h6>
+                        <span class="badge text-bg-light">Summary</span>
+                    </div>
+
+                    <div class="row g-2 small">
+                        <div class="col-6">
+                            <div class="text-muted">Total Audit Logs</div>
+                            <div class="fw-semibold">@Model.TotalAuditLogs</div>
+                        </div>
+
+                        <div class="col-6">
+                            <div class="text-muted">Trips (DriverUserId)</div>
+                            <div class="fw-semibold">@Model.TripsAsDriverUser</div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="text-muted">Bookings on those trips</div>
+                            <div class="fw-semibold">@Model.BookingsOnThoseTrips</div>
+                        </div>
+
+                        <div class="col-6">
+                            <div class="text-muted">Total Due</div>
+                            <div class="fw-semibold">@Model.TotalDue.ToString("0.##")</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted">Total Paid</div>
+                            <div class="fw-semibold">@Model.TotalPaid.ToString("0.##")</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="text-muted">Remaining</div>
+                            <div class="fw-semibold">@Model.Remaining.ToString("0.##")</div>
+                        </div>
+                    </div>
+
+                    <div class="text-muted small mt-3">
+                        * Finance summary is calculated from bookings created by this user (CreatedByUserId).
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-outline-primary w-100 mt-2"
+                    data-bs-toggle="modal" data-bs-target="#financeModal"
+                    id="btnOpenFinance">
+                <i class="bi bi-cash-coin me-1"></i> Details (Bookings & Collections)
+            </button>
+
+            <!-- ✅ NEW: Change Password button (بدون تغيير القديم) -->
+            <button type="button" class="btn btn-outline-warning w-100 mt-2"
+                    data-bs-toggle="modal" data-bs-target="#passwordModal"
+                    id="btnOpenPassword">
+                <i class="bi bi-key me-1"></i> Change Password
+            </button>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="col-lg-8">
+
+            <form method="get" asp-action="UserDetails" asp-controller="Trips">
+                <input type="hidden" name="id" value="@Model.UserID" />
+
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h6 class="mb-0">Filter Audit</h6>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-4 col-lg-3">
+                                <label class="form-label">From</label>
+                                <input type="date" name="fromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" class="form-control" />
+                            </div>
+
+                            <div class="col-md-4 col-lg-3">
+                                <label class="form-label">To</label>
+                                <input type="date" name="toDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" class="form-control" />
+                            </div>
+
+                            <div class="col-md-4 col-lg-3">
+                                <label class="form-label">Action</label>
+                                <input type="text" name="actionFilter" value="@Model.ActionFilter" class="form-control" placeholder="login, create..." />
+                            </div>
+
+                            <div class="col-12 d-flex gap-2">
+                                <button class="btn btn-primary">
+                                    <i class="bi bi-search me-1"></i> Filter
+                                </button>
+
+                                <a asp-action="UserDetails"
+                                   asp-route-id="@Model.UserID"
+                                   class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h6 class="mb-0">Recent Audit</h6>
+                        <div class="text-muted small">
+                            Showing: <b>@(Model.RecentAudit?.Count ?? 0)</b>
+                        </div>
+                    </div>
+
+                    @if (Model.RecentAudit.Count == 0)
+                    {
+                        <div class="text-muted d-flex align-items-center gap-2">
+                            <i class="bi bi-info-circle"></i>
+                            <span>No audit records.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="white-space:nowrap;">Time (Cairo)</th>
+                                        <th>Action</th>
+                                        <th>Entity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var a in Model.RecentAudit)
+                                    {
+                                        <tr>
+                                            <td style="white-space:nowrap;">@a.CairoTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                            <td><span class="badge text-bg-light">@a.Action</span></td>
+                                            <td>@a.Entity</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="financeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" id="financeModalContent">
+            <div class="modal-body p-4 text-muted">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ NEW: Password modal (بدون تغيير القديم) -->
+<div class="modal fade" id="passwordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" id="passwordModalContent">
+            <div class="modal-body p-4 text-muted">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<script nonce="@nonce">
+    (function(){
+      const userId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.UserID.ToString()));
+
+      async function loadFinance(params) {
+        // ✅ مهم: استخدم Url.Action مباشرة بدل window.location.origin
+        const baseUrl = '@Url.Action("UserFinanceModal", "Trips")';
+        const url = new URL(baseUrl, window.location.href);
+        url.searchParams.set('id', userId);
+
+        if (params) {
+          for (const [k,v] of Object.entries(params)) {
+            if (v !== null && v !== undefined && v !== '') url.searchParams.set(k, v);
+          }
+        }
+
+        try {
+          const res = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+          if (!res.ok) {
+            const txt = await res.text();
+            document.getElementById('financeModalContent').innerHTML =
+              `<div class="p-4 text-danger">Failed: ${res.status}<br/>${txt}</div>`;
+            return;
+          }
+          const html = await res.text();
+          document.getElementById('financeModalContent').innerHTML = html;
+
+          // wire buttons inside modal after load
+          const btnReload = document.getElementById('btnReloadFinance');
+          const btnReset = document.getElementById('btnResetFinance');
+
+          if (btnReload) {
+            btnReload.addEventListener('click', () => {
+              const p = {
+                bFrom: document.getElementById('bFrom')?.value,
+                bTo: document.getElementById('bTo')?.value,
+                bSearch: document.getElementById('bSearch')?.value,
+                bStatus: document.getElementById('bStatus')?.value,
+                cFrom: document.getElementById('cFrom')?.value,
+                cTo: document.getElementById('cTo')?.value,
+                cMethod: document.getElementById('cMethod')?.value,
+              };
+              loadFinance(p);
+            });
+          }
+
+          if (btnReset) {
+            btnReset.addEventListener('click', () => loadFinance({}));
+          }
+        } catch (e) {
+          document.getElementById('financeModalContent').innerHTML =
+            `<div class="p-4 text-danger">JS error: ${e}</div>`;
+        }
+      }
+
+      // ✅ الأفضل: load عند فتح المودال (مش عند الضغط على الزر فقط)
+      const modalEl = document.getElementById('financeModal');
+      if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', () => loadFinance({}));
+      }
+    })();
+</script>
+
+<!-- ✅ NEW: Password modal loader script (بدون تغيير القديم) -->
+<script nonce="@nonce">
+    (function(){
+      const userId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.UserID));
+
+      async function loadPasswordModal() {
+        const baseUrl = '@Url.Action("UserPasswordModal", "Trips")';
+        const url = new URL(baseUrl, window.location.href);
+        url.searchParams.set('id', userId);
+
+        try {
+          const res = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+          const html = await res.text();
+          document.getElementById('passwordModalContent').innerHTML = html;
+        } catch(e) {
+          document.getElementById('passwordModalContent').innerHTML =
+            `<div class="p-4 text-danger">JS error: ${e}</div>`;
+        }
+      }
+
+      const modalEl = document.getElementById('passwordModal');
+      if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', () => loadPasswordModal());
+      }
+    })();
+</script>
+
+<script nonce="@nonce">
+    (function () {
+      const modalId = 'passwordModal';
+      const contentId = 'passwordModalContent';
+
+      const modalEl = document.getElementById(modalId);
+      const contentEl = document.getElementById(contentId);
+      if (!modalEl || !contentEl) return;
+
+      const userId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.UserID));
+
+      function setLoading() {
+        contentEl.innerHTML = `<div class="modal-body p-4 text-muted">Loading...</div>`;
+      }
+
+      function setEye(isShown) {
+        const btn = contentEl.querySelector('#btnTogglePw');
+        const icon = contentEl.querySelector('#pwEyeIcon');
+        if (!btn || !icon) return;
+
+        icon.classList.toggle('bi-eye', !isShown);
+        icon.classList.toggle('bi-eye-slash', isShown);
+
+        btn.setAttribute('aria-pressed', isShown ? 'true' : 'false');
+        btn.setAttribute('aria-label', isShown ? 'Hide password' : 'Show password');
+        btn.title = isShown ? 'Hide password' : 'Show password';
+      }
+
+      function toggleEye() {
+        const p1 = contentEl.querySelector('#NewPassword');
+        const p2 = contentEl.querySelector('#ConfirmPassword');
+        if (!p1) return;
+
+        const show = p1.type === 'password';
+        p1.type = show ? 'text' : 'password';
+        if (p2) p2.type = show ? 'text' : 'password';
+
+        setEye(show);
+      }
+
+      async function loadPasswordModal() {
+        setLoading();
+
+        const baseUrl = '@Url.Action("UserPasswordModal", "Trips")';
+        const url = new URL(baseUrl, window.location.href);
+        url.searchParams.set('id', userId);
+
+        try {
+          const res = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+          const html = await res.text();
+          contentEl.innerHTML = html;
+
+          // default state after load
+          setEye(false);
+        } catch (e) {
+          contentEl.innerHTML = `<div class="modal-body p-4 text-danger">JS error: ${e}</div>`;
+        }
+      }
+
+      // ✅ load on modal open
+      modalEl.addEventListener('shown.bs.modal', loadPasswordModal);
+
+      // ✅ optional: reset content when closed
+      modalEl.addEventListener('hidden.bs.modal', setLoading);
+
+      // ✅ Eye button click (delegation, survives partial reload)
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('#btnTogglePw');
+        if (!btn) return;
+        if (!contentEl.contains(btn)) return; // ensure inside our modal content
+        toggleEye();
+      });
+
+      // ✅ Submit (delegation, survives partial reload)
+      document.addEventListener('submit', async (e) => {
+        const frm = e.target.closest('#frmAdminChangePassword');
+        if (!frm) return;
+        if (!contentEl.contains(frm)) return;
+
+        e.preventDefault();
+
+        const fd = new FormData(frm);
+        const p1 = (fd.get('NewPassword') || '').toString();
+        const p2 = (fd.get('ConfirmPassword') || '').toString();
+
+        if (p1 !== p2) {
+          const body = contentEl.querySelector('.modal-body');
+          if (body) {
+            body.insertAdjacentHTML('afterbegin', `
+              <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <div>Passwords do not match.</div>
+              </div>`);
+          }
+          return;
+        }
+
+        try {
+          const res = await fetch(frm.action, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+
+          const html = await res.text();
+          contentEl.innerHTML = html;
+
+          // keep default eye state after reload
+          setEye(false);
+
+          if (html.includes('alert-success')) {
+            setTimeout(() => {
+              const inst = bootstrap.Modal.getInstance(modalEl);
+              if (inst) inst.hide();
+            }, 700);
+          }
+        } catch (err) {
+          contentEl.innerHTML = `
+            <div class="modal-body p-4">
+              <div class="alert alert-danger d-flex align-items-center gap-2 mb-0">
+                <i class="bi bi-bug-fill"></i>
+                <div>Request failed: ${err}</div>
+              </div>
+            </div>`;
+        }
+      });
+
+    })();
+</script>

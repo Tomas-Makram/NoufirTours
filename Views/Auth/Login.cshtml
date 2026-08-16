@@ -1,0 +1,244 @@
+﻿@model NoufirTours.Models.Auth.LoginModel
+@{
+    ViewData["Title"] = "Login";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+}
+
+<style nonce="@nonce">
+    .nt-auth-wrap {
+        min-height: calc(100vh - 220px);
+        display: grid;
+        place-items: center;
+        padding: 14px 0 28px;
+    }
+
+    .nt-auth-card {
+        width: min(560px,92vw);
+        border-radius: 28px;
+        border: 1px solid rgba(0,0,0,.08);
+        background: rgba(255,255,255,.78);
+        box-shadow: 0 24px 85px rgba(0,0,0,.12);
+        overflow: hidden;
+        position: relative;
+        isolation: isolate;
+    }
+
+    [data-bs-theme="dark"] .nt-auth-card {
+        border-color: rgba(255,255,255,.10);
+        background: rgba(18,18,18,.72);
+        box-shadow: 0 26px 95px rgba(0,0,0,.62);
+    }
+
+    .nt-auth-card::before {
+        content: "";
+        position: absolute;
+        inset: -40%;
+        background: linear-gradient(120deg,transparent 30%,rgba(255,255,255,.22),transparent 60%);
+        transform: rotate(12deg);
+        animation: ntAuthShimmer 1.6s ease-in-out infinite;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    @@keyframes ntAuthShimmer {
+        0% {
+            transform: translateX(-30%) rotate(12deg);
+            opacity: 0
+        }
+
+        35% {
+            opacity: .95
+        }
+
+        100% {
+            transform: translateX(30%) rotate(12deg);
+            opacity: 0
+        }
+    }
+
+    .nt-auth-inner {
+        position: relative;
+        z-index: 1;
+    }
+
+    .nt-auth-header {
+        padding: 22px 22px 18px;
+        background: radial-gradient(900px 320px at 20% 10%, rgba(26,115,255,.22), transparent 55%), radial-gradient(800px 320px at 80% 90%, rgba(255,204,0,.22), transparent 55%);
+        border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+
+    .nt-auth-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+        .nt-auth-brand img {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            object-fit: cover;
+            box-shadow: 0 14px 30px rgba(0,0,0,.18);
+            background: rgba(255,255,255,.35);
+        }
+
+    .nt-auth-title {
+        margin: 0;
+        font-weight: 950;
+        letter-spacing: .2px;
+        line-height: 1.1;
+    }
+
+    .nt-auth-sub {
+        margin: 6px 0 0;
+        opacity: .85;
+        font-size: .95rem;
+        font-weight: 650;
+    }
+
+    .nt-auth-body {
+        padding: 18px 22px 22px;
+    }
+
+    .nt-field label {
+        font-weight: 850;
+        margin-bottom: .45rem;
+    }
+
+    .nt-input {
+        border-radius: 18px !important;
+        padding: .95rem 1rem !important;
+        border-color: rgba(0,0,0,.10) !important;
+        background: rgba(255,255,255,.66) !important;
+    }
+
+    [data-bs-theme="dark"] .nt-input {
+        border-color: rgba(255,255,255,.12) !important;
+        background: rgba(20,20,20,.55) !important;
+    }
+
+    .nt-input:focus {
+        box-shadow: 0 0 0 .22rem rgba(26,115,255,.18) !important;
+    }
+
+    .nt-pw-group {
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid rgba(0,0,0,.10);
+        background: rgba(255,255,255,.66);
+        display: flex;
+        align-items: stretch;
+        position: relative;
+    }
+
+    [data-bs-theme="dark"] .nt-pw-group {
+        border-color: rgba(255,255,255,.12);
+        background: rgba(20,20,20,.55);
+    }
+
+    .nt-pw-group .form-control {
+        border: 0 !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto !important;
+        z-index: 1;
+    }
+
+    .nt-iconbtn {
+        flex: 0 0 54px;
+        width: 54px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        opacity: .9;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        z-index: 10;
+        pointer-events: auto;
+    }
+
+    .nt-auth-actions {
+        display: flex;
+        align-items: center;
+        justify-content: end;
+        margin-top: 14px;
+    }
+
+    .nt-btn-primary {
+        border-radius: 18px;
+        padding: .9rem 1.15rem;
+        font-weight: 950;
+        letter-spacing: .2px;
+        box-shadow: 0 16px 35px rgba(13,110,253,.20);
+    }
+
+    .validation-summary-valid {
+        display: none;
+    }
+</style>
+
+<div class="nt-auth-wrap">
+    <div class="nt-auth-card">
+        <div class="nt-auth-inner">
+            <div class="nt-auth-header">
+                <div class="nt-auth-brand">
+                    <img src="~/Logo.jpg" alt="NoufirTours" onerror="this.style.display='none';" />
+                    <div>
+                        <h4 class="nt-auth-title">Welcome back</h4>
+                        <p class="nt-auth-sub">Log in to manage your trips 🚌</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nt-auth-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger mb-3" role="alert"></div>
+
+                <form asp-controller="Auth" asp-action="Login" method="post" novalidate>
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3 nt-field">
+                        <label asp-for="username" class="form-label">UserName</label>
+                        <input asp-for="username" class="form-control nt-input"
+                               placeholder="Enter your username" autocomplete="username" />
+                        <span asp-validation-for="username" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-2 nt-field">
+                        <label asp-for="password" class="form-label">Password</label>
+
+                        <div class="nt-pw-group">
+                            <input asp-for="password" id="passwordInput" type="password"
+                                   class="form-control nt-input" placeholder="••••••••"
+                                   autocomplete="current-password" />
+
+                            <button type="button"
+                                    class="nt-iconbtn"
+                                    data-nt-toggle="password"
+                                    data-target="passwordInput"
+                                    aria-label="Show password"
+                                    title="Show/Hide password">
+                                <!-- SVGs unchanged -->
+                            </button>
+                        </div>
+
+                        <span asp-validation-for="password" class="text-danger small"></span>
+                    </div>
+
+                    <div class="nt-auth-actions">
+                        <button type="submit" class="btn btn-primary nt-btn-primary px-4">Login</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

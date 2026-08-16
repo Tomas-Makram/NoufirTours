@@ -1,0 +1,542 @@
+﻿@using NoufirTours.Data
+@model NoufirTours.Models.Trips.Trips.TripDetailsViewModel
+
+@{
+    ViewData["Title"] = "Trip Details";
+    var nonce = Context.Items["CSPNonce"]?.ToString();
+
+    string Safe(string? v) => string.IsNullOrWhiteSpace(v) ? "-" : v;
+    string Money(decimal? v) => v.HasValue ? v.Value.ToString("0.##") : "-";
+
+    var hasCoords = Model.PickupLat.HasValue && Model.PickupLon.HasValue;
+    var mapsUrl = hasCoords
+        ? $"https://www.google.com/maps?q={Model.PickupLat.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)},{Model.PickupLon.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+        : "";
+
+    // ✅ Determine if trip date/time already passed (to block Restore in UI)
+    DateTime departAt;
+    var isDepartParsed = DateTime.TryParseExact(
+        $"{Model.DepartDate} {Model.DepartTime}",
+        "yyyy-MM-dd HH:mm",
+        System.Globalization.CultureInfo.InvariantCulture,
+        System.Globalization.DateTimeStyles.None,
+        out departAt
+    );
+    var isPastTrip = isDepartParsed && DateTime.Now >= departAt;
+
+    // Determine status badge based on IsArchived and IsActive combination
+    string statusBadgeHtml;
+    if (Model.IsArchived)
+    {
+        statusBadgeHtml = "<span class=\"badge bg-danger-subtle text-danger border rounded-pill px-3\"><i class=\"bi bi-archive me-1\"></i> Archived</span>";
+    }
+    else if (!Model.IsActive)
+    {
+        statusBadgeHtml = "<span class=\"badge bg-secondary-subtle text-secondary border rounded-pill px-3\"><i class=\"bi bi-pause-circle me-1\"></i> Inactive</span>";
+    }
+    else
+    {
+        statusBadgeHtml = "<span class=\"badge bg-success-subtle text-success border rounded-pill px-3\"><i class=\"bi bi-check-circle me-1\"></i> Active</span>";
+    }
+
+    // Get price type display
+    string GetPriceTypeDisplay()
+    {
+        switch (Model.PriceType)
+        {
+            case TripPriceType.Go:
+                return "<span class=\"badge bg-primary-subtle text-primary border rounded-pill px-3\"><i class=\"bi bi-arrow-right me-1\"></i> Go Only</span>";
+            case TripPriceType.Return:
+                return "<span class=\"badge bg-info-subtle text-info border rounded-pill px-3\"><i class=\"bi bi-arrow-left me-1\"></i> Return Only</span>";
+            case TripPriceType.Round:
+                    return ("<span class=\"badge bg-primary-subtle text-primary border rounded-pill px-3\"><i class=\"bi bi-arrow-right me-1\"></i> Go Only</span><span class=\"badge bg-info-subtle text-info border rounded-pill px-3\"><i class=\"bi bi-arrow-left me-1\"></i> Return Only</span>");
+            default:
+                return "";
+        }
+    }
+}
+
+<div class="container py-4 details2">
+    <!-- ===== Alerts (Success / Error / Warning) ===== -->
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm rounded-3 mb-3" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm rounded-3 mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["Warning"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show shadow-sm rounded-3 mb-3" role="alert">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>
+            @TempData["Warning"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <div>
+                    <h3 class="mb-0">Trip Details</h3>
+                    <div class="text-muted small">Trip Name: @Safe(Model.TripName)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+
+            <a asp-action="Trips" asp-controller="Trips" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="bi bi-arrow-left me-1"></i> Back
+            </a>
+
+            <a asp-action="EditTrip" asp-controller="Trips" asp-route-id="@Model.Id" class="btn btn-warning rounded-pill px-3">
+                <i class="bi bi-pencil-square me-1"></i> Edit
+            </a>
+
+            @* Archive / Restore with rule *@
+           @if (Model.IsActive)
+            {
+                <form asp-action="InactiveTrip" asp-controller="Trips" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit" class="btn btn-outline-danger rounded-pill px-3"
+                            onclick="return confirm('Set this trip to Inactive?');">
+                        <i class="bi bi-pause-circle me-1"></i> Inactive
+                    </button>
+                </form>
+            }
+            else
+            {
+                <form asp-action="ActiveTrip" asp-controller="Trips" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit"
+                            class="btn btn-success rounded-pill px-3"
+                            onclick="return confirm('Set this trip to Active?');"
+                            >
+                        <i class="bi bi-check-circle me-1"></i> Active
+                    </button>
+                </form>
+            }
+
+            @* Delete button (permanent only if no bookings; otherwise archives) *@
+            <form asp-action="DeleteTrip" asp-controller="Trips" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button type="submit"
+                        class="btn btn-danger rounded-pill px-3"
+                        onclick="return confirm('Delete this trip?\n\nIf it has bookings it will be archived (not deleted).');">
+                    <i class="bi bi-trash3 me-1"></i> Delete
+                </button>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- Summary Card with Status Badge and Trip Type -->
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                @Html.Raw(statusBadgeHtml)
+                @Html.Raw(GetPriceTypeDisplay())
+
+                <span class="badge bg-light text-dark border rounded-pill px-3">
+                    <i class="bi bi-calendar-event me-1"></i>@Safe(Model.DepartDate)
+                </span>
+                <span class="badge bg-light text-dark border rounded-pill px-3">
+                    <i class="bi bi-clock me-1"></i>@Safe(Model.DepartTime)
+                </span>
+            </div>
+
+            <div class="text-muted small">
+                Route: <b>@Safe(Model.FromCity)</b> → <b>@Safe(Model.ToCity)</b>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+
+        <!-- Trip Info Column -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-info-circle me-1"></i> Trip Info
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+
+                        <div class="col-12">
+                            <div class="text-muted small">Trip Name</div>
+                            <div class="fw-bold fs-5">@Safe(Model.TripName)</div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="text-muted small">Trip Date & Time</div>
+                            <div class="fw-bold fs-5">@Safe(Model.DepartDate) , @Safe(Model.DepartTime)</div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="text-muted small">Trip Type</div>
+                            <div class="fw-bold fs-6">
+                                @switch (Model.PriceType)
+                                {
+                                    case TripPriceType.Go:
+                                        <span><i class="bi bi-arrow-right text-primary"></i> Go Only</span>
+                                        break;
+                                    case TripPriceType.Return:
+                                        <span><i class="bi bi-arrow-left text-info"></i> Return Only</span>
+                                        break;
+                                    case TripPriceType.Round:
+                                        <span><i class="bi bi-arrow-left-right text-warning"></i> Round Trip</span>
+                                        break;
+                                }
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="text-muted small">Pickup Location</div>
+                            <div class="fw-semibold">@Safe(Model.PickupPlace)</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="text-muted small">Dropoff Location</div>
+                            <div class="fw-semibold">@Safe(Model.DropoffPlace)</div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="text-muted small">Pickup Coordinates</div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <span class="badge bg-light text-dark border">Lat: @((Model.PickupLat?.ToString("0.######")) ?? "-")</span>
+                                <span class="badge bg-light text-dark border">Lon: @((Model.PickupLon?.ToString("0.######")) ?? "-")</span>
+
+                                @if (hasCoords)
+                                {
+                                    <a class="btn btn-sm btn-outline-primary ms-auto"
+                                       href="@mapsUrl" target="_blank" rel="noopener">
+                                        <i class="bi bi-map me-1"></i> Open Map
+                                    </a>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="text-muted small mb-2">Pricing Details</div>
+
+                            @if (Model.PriceType == TripPriceType.Go)
+                            {
+                                <div class="border rounded p-3 bg-light">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3"><i class="bi bi-arrow-right-circle-fill text-primary fs-4"></i></div>
+                                        <div>
+                                            <div class="small text-muted">Go Price (ذهاب فقط)</div>
+                                            <div class="fw-bold fs-5">@Money(Model.SeatPriceGo)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            else if (Model.PriceType == TripPriceType.Return)
+                            {
+                                <div class="border rounded p-3 bg-light">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3"><i class="bi bi-arrow-left-circle-fill text-info fs-4"></i></div>
+                                        <div>
+                                            <div class="small text-muted">Return Price (عودة فقط)</div>
+                                            <div class="fw-bold fs-5">@Money(Model.SeatPriceReturn)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            else if (Model.PriceType == TripPriceType.Round)
+                            {
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <div class="border rounded p-2 text-center">
+                                            <div class="small text-muted">Go</div>
+                                            <div class="fw-bold">@Money(Model.SeatPriceGo)</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="border rounded p-2 text-center">
+                                            <div class="small text-muted">Return</div>
+                                            <div class="fw-bold">@Money(Model.SeatPriceReturn)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="col-12">
+                            <div class="text-muted small">Notes</div>
+                            @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                            {
+                                <div class="border rounded p-2 bg-light" style="white-space:pre-wrap">@Model.Notes</div>
+                            }
+                            else
+                            {
+                                <div class="text-muted">-</div>
+                            }
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bus + Driver Column -->
+        <div class="col-lg-6">
+            <!-- Bus Card -->
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-bus-front me-1"></i> Bus</span>
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                            id="btnBusModal"
+                            @(Model.BusId == null ? "disabled" : "")>
+                        <i class="bi bi-eye"></i> Details
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="text-muted small">Selected Bus</div>
+                    <div class="fw-semibold">
+                        @(Model.BusId == null ? "-" : $"{Safe(Model.Bus?.BusNumber)} • {Safe(Model.Bus?.PlateNumber)}")
+                    </div>
+                    @if (Model.Bus != null)
+                    {
+                        <div class="mt-2 small">
+                            <span class="badge bg-light text-dark me-2">Model: @Safe(Model.Bus.ModelName) @Model.Bus.ModelYear</span>
+                            <span class="badge bg-light text-dark">Seats: @Model.Bus.SeatsActive/@Model.Bus.SeatsTotal</span>
+                        </div>
+                    }
+                    @if (Model.BusId == null)
+                    {
+                        <div class="alert alert-warning mt-2 mb-0 py-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i> No bus assigned.
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Driver Card -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-person-badge me-1"></i> Driver</span>
+                    <button type="button" class="btn btn-outline-success btn-sm"
+                            id="btnDriverModal"
+                            @(Model.DriverId == null ? "disabled" : "")>
+                        <i class="bi bi-eye"></i> Details
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="text-muted small">Selected Driver</div>
+                    <div class="fw-semibold">
+                        @(Model.DriverId == null ? "-" : $"{Safe(Model.Driver?.FullName)}")
+                    </div>
+
+                    @if (Model.Driver?.Phones != null && Model.Driver.Phones.Any())
+                    {
+                        <div class="mt-2">
+                            @foreach (var line in Model.Driver.Phones)
+                            {
+                                if (line.IsPrimary)
+                                {
+                                    <div class="fw-semibold">@line.PhoneNumber <span class="badge bg-success ms-2">Primary</span></div>
+                                }
+                                else
+                                {
+                                    <div class="fw-semibold">@line.PhoneNumber</div>
+                                }
+                            }
+                        </div>
+                    }
+
+                    @if (Model.Driver != null)
+                    {
+                        <div class="mt-2 small">
+                            <span class="badge bg-light text-dark">National ID: @Safe(Model.Driver.NationalId)</span>
+                        </div>
+                    }
+
+                    @if (Model.DriverId == null)
+                    {
+                        <div class="alert alert-warning mt-2 mb-0 py-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i> No driver assigned.
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- BUS MODAL -->
+<div class="modal fade" id="busModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Bus Details</h5>
+                    <small class="opacity-75">Full information about selected bus</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="busModalBody">Loading...</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DRIVER MODAL -->
+<div class="modal fade" id="driverModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Driver Details</h5>
+                    <small class="opacity-75">Full information about selected driver</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="driverModalBody">Loading...</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script nonce="@nonce">
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const busId = "@(Model.BusId?.ToString() ?? "")";
+            const driverId = "@(Model.DriverId?.ToString() ?? "")";
+
+            // Initialize modals only if they exist
+            const busModalEl = document.getElementById('busModal');
+            const driverModalEl = document.getElementById('driverModal');
+            if (!busModalEl || !driverModalEl) return;
+
+            const busModal = new bootstrap.Modal(busModalEl);
+            const driverModal = new bootstrap.Modal(driverModalEl);
+
+            async function fetchHtml(url) {
+                try {
+                    const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+                    if (!res.ok) return null;
+                    return await res.text();
+                } catch { return null; }
+            }
+
+            const btnBus = document.getElementById("btnBusModal");
+            if (btnBus) {
+                btnBus.addEventListener("click", async function () {
+                    if (!busId) return;
+
+                    const bodyEl = document.getElementById("busModalBody");
+                    if (!bodyEl) return;
+                    bodyEl.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+                    const html = await fetchHtml(`/Trips/BusDetailsModal?id=${encodeURIComponent(busId)}`);
+                    if (!html) { bodyEl.innerHTML = '<div class="alert alert-danger">Failed to load bus details.</div>'; return; }
+
+                    bodyEl.innerHTML = html;
+                    busModal.show();
+                });
+            }
+
+            const btnDriver = document.getElementById("btnDriverModal");
+            if (btnDriver) {
+                btnDriver.addEventListener("click", async function () {
+                    if (!driverId) return;
+
+                    const bodyEl = document.getElementById("driverModalBody");
+                    if (!bodyEl) return;
+                    bodyEl.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-success" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+                    const html = await fetchHtml(`/Trips/DriverDetailsModal?id=${encodeURIComponent(driverId)}`);
+                    if (!html) { bodyEl.innerHTML = '<div class="alert alert-danger">Failed to load driver details.</div>'; return; }
+
+                    bodyEl.innerHTML = html;
+                    driverModal.show();
+                });
+            }
+        });
+    </script>
+    <script nonce="@nonce">
+        document.addEventListener("DOMContentLoaded", function () {
+            setTimeout(() => {
+                document.querySelectorAll('.alert').forEach(a => {
+                    try { bootstrap.Alert.getOrCreateInstance(a).close(); } catch {}
+                });
+            }, 4000);
+        });
+    </script>
+}
+
+<style nonce="@nonce">
+    .details2 .icon {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        color: #fff;
+        background: linear-gradient(135deg,#0d6efd,#22c55e);
+        box-shadow: 0 12px 26px rgba(13,110,253,.18);
+    }
+
+    .badge.bg-success-subtle {
+        background-color: #d1e7dd !important;
+    }
+
+    .badge.bg-danger-subtle {
+        background-color: #f8d7da !important;
+    }
+
+    .badge.bg-secondary-subtle {
+        background-color: #e2e3e5 !important;
+    }
+
+    .badge.bg-primary-subtle {
+        background-color: #cfe2ff !important;
+    }
+
+    .badge.bg-info-subtle {
+        background-color: #cff4fc !important;
+    }
+
+    .badge.bg-warning-subtle {
+        background-color: #fff3cd !important;
+    }
+
+    .card-header {
+        border-bottom: 1px solid rgba(0,0,0,.05);
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    .border.rounded.p-3.bg-light {
+        transition: all 0.2s ease;
+    }
+
+        .border.rounded.p-3.bg-light:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+</style>

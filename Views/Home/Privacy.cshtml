@@ -1,0 +1,112 @@
+﻿@{
+    ViewData["Title"] = "Privacy Policy";
+    var siteName = "NoufirTours";
+    var contactEmail = "support@noufirtours.com"; // عدّلها لو عندك ايميل حقيقي
+    var contactPhone = "01000000000"; // عدّلها
+}
+
+<div class="container py-4">
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-shield-check fs-3 text-success"></i>
+        <div>
+            <h3 class="mb-0">@ViewData["Title"]</h3>
+            <div class="text-muted small">Last updated: @DateTime.Today.ToString("yyyy-MM-dd")</div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <p class="text-muted">
+                This Privacy Policy explains how <strong>@siteName</strong> collects, uses, shares, and protects your information when you use our website and services,
+                including browsing trips, booking seats, and making payments.
+            </p>
+
+            <hr />
+
+            <h5 class="mt-0">1) Information We Collect</h5>
+            <ul class="mb-3">
+                <li><strong>Account Information:</strong> username, password (stored securely), role (e.g., user/staff/admin).</li>
+                <li><strong>Contact Information:</strong> full name and phone number (if provided).</li>
+                <li><strong>Booking Information:</strong> customer name, phone, trip details, seat selection, booking status (booked/canceled), amounts (total/paid/due).</li>
+                <li><strong>Payment & Collection Records:</strong> payment method, amounts collected, timestamps, and the staff member who recorded a collection (if applicable).</li>
+                <li><strong>Technical Data:</strong> IP address, browser type, device info, and basic usage logs (for security and performance).</li>
+            </ul>
+
+            <h5>2) How We Use Your Information</h5>
+            <ul class="mb-3">
+                <li>To create and manage your account and authenticate access.</li>
+                <li>To process bookings, cancellations, and seat allocations.</li>
+                <li>To record payments/collections, track balances (paid/due), and provide finance summaries.</li>
+                <li>To provide customer support and respond to inquiries.</li>
+                <li>To detect fraud, prevent abuse, and maintain platform security.</li>
+                <li>To improve our services and user experience.</li>
+            </ul>
+
+            <h5>3) Legal Bases (General)</h5>
+            <p class="mb-3 text-muted">
+                We process data to fulfill our services (bookings and support), to comply with legal obligations (as applicable),
+                and to protect legitimate interests such as preventing fraud and securing the platform.
+            </p>
+
+            <h5>4) Sharing Your Information</h5>
+            <p class="mb-2">
+                We do <strong>not</strong> sell your personal data. We may share information only in the following cases:
+            </p>
+            <ul class="mb-3">
+                <li><strong>Service Providers:</strong> hosting, analytics, SMS/communication providers, payment processors (if used).</li>
+                <li><strong>Legal Requirements:</strong> if required by law, court order, or governmental request.</li>
+                <li><strong>Business Protection:</strong> to protect our users, company, and platform from fraud or security threats.</li>
+            </ul>
+
+            <h5>5) Data Retention</h5>
+            <p class="mb-3 text-muted">
+                We retain account and booking records as long as needed to provide services, comply with legal requirements, and maintain accurate business records.
+                Booking, payment, and audit logs may be kept for operational and compliance reasons.
+            </p>
+
+            <h5>6) Security</h5>
+            <p class="mb-3 text-muted">
+                We use reasonable administrative, technical, and physical safeguards to protect your data.
+                No method of transmission or storage is 100% secure, but we work to protect information from unauthorized access, alteration, or disclosure.
+            </p>
+
+            <h5>7) Cookies & Tracking</h5>
+            <p class="mb-3 text-muted">
+                We may use cookies to maintain sessions, remember preferences, and improve performance.
+                You can control cookies in your browser settings. Disabling cookies may affect site functionality.
+            </p>
+
+            <h5>8) Your Choices & Rights</h5>
+            <ul class="mb-3">
+                <li>You may update your profile information in the Settings page (where available).</li>
+                <li>You may request access, correction, or deletion of personal data where applicable and permitted by law.</li>
+                <li>You may request information about how your data is used.</li>
+            </ul>
+
+            <h5>9) Children’s Privacy</h5>
+            <p class="mb-3 text-muted">
+                Our services are not intended for children under 13 (or the minimum age required by local laws).
+                If you believe a child has provided personal data, please contact us.
+            </p>
+
+            <h5>10) International Users</h5>
+            <p class="mb-3 text-muted">
+                If you access the site from outside our operating region, your information may be processed and stored where our servers or providers operate.
+            </p>
+
+            <h5>11) Changes to This Policy</h5>
+            <p class="mb-3 text-muted">
+                We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated "Last updated" date.
+            </p>
+
+            <h5>12) Contact Us</h5>
+            <div class="border rounded p-3 bg-light">
+                <div class="fw-semibold">@siteName Support</div>
+                <div class="text-muted small">Email: @contactEmail</div>
+                <div class="text-muted small">Phone: @contactPhone</div>
+            </div>
+
+        </div>
+    </div>
+</div>

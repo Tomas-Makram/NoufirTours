@@ -1,0 +1,481 @@
+﻿@model NoufirTours.Models.Home.Settings.SettingsModel
+@{
+    ViewData["Title"] = "Settings";
+    var tab = (Model?.ActiveTab ?? "profile").ToLowerInvariant();
+
+    bool isProfile = tab == "profile";
+    bool isPassword = tab == "password";
+    bool isFinance = tab == "finance";
+    bool isAudit = tab == "audit";
+
+    string Money(decimal v) => v.ToString("0.##");
+
+    // CSP nonce
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    // finance search vars (no model changes)
+    var fFrom = (ViewData["FinanceFrom"]?.ToString() ?? "");
+    var fTo = (ViewData["FinanceTo"]?.ToString() ?? "");
+    var fQ = (ViewData["FinanceQ"]?.ToString() ?? "");
+
+    decimal cardTotalDue = (ViewData["FinanceCard_TotalDue"] as decimal?) ?? 0m;
+    decimal cardTotalPaid = (ViewData["FinanceCard_TotalPaid"] as decimal?) ?? 0m;
+    decimal cardRemaining = (ViewData["FinanceCard_Remaining"] as decimal?) ?? 0m;
+
+    int cardBookingsCount = (ViewData["FinanceCard_BookingsCount"] as int?) ?? (Model?.FinanceBookings?.Count ?? 0);
+    int cardCollectionsCount = (ViewData["FinanceCard_CollectionsCount"] as int?) ?? (Model?.RecentCollections?.Count ?? 0);
+}
+
+<style nonce="@nonce">
+    /* ===== Theme fixes (Bootstrap 5 light/dark) ===== */
+    .card {
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
+        border-color: var(--bs-border-color);
+    }
+
+    .card-header {
+        background: var(--bs-tertiary-bg);
+        border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    /* Remove hardcoded light table header behavior */
+    .table thead th {
+        background: var(--bs-tertiary-bg);
+        color: var(--bs-body-color);
+        border-bottom-color: var(--bs-border-color);
+    }
+
+    .table td, .table th {
+        border-color: var(--bs-border-color);
+    }
+
+    /* Tabs: make active tab readable in dark theme */
+    .nav-tabs {
+        border-bottom: 1px solid var(--bs-border-color);
+    }
+
+        .nav-tabs .nav-link {
+            color: var(--bs-secondary-color);
+            border: 1px solid transparent;
+            border-top-left-radius: .6rem;
+            border-top-right-radius: .6rem;
+        }
+
+            .nav-tabs .nav-link:hover {
+                color: var(--bs-body-color);
+                border-color: transparent;
+            }
+
+            .nav-tabs .nav-link.active {
+                color: var(--bs-body-color);
+                background: var(--bs-body-bg);
+                border-color: var(--bs-border-color) var(--bs-border-color) var(--bs-body-bg);
+            }
+
+    /* Inputs/buttons sizing polish */
+    .form-control, .form-select {
+        border-color: var(--bs-border-color);
+        background-color: var(--bs-body-bg);
+        color: var(--bs-body-color);
+    }
+
+        .form-control::placeholder {
+            color: var(--bs-secondary-color);
+            opacity: .85;
+        }
+
+    .input-group-text {
+        background: var(--bs-tertiary-bg);
+        color: var(--bs-body-color);
+        border-color: var(--bs-border-color);
+    }
+
+    /* Audit/Finance search row: keep same height */
+    .search-actions .btn {
+        white-space: nowrap;
+    }
+
+    /* Subtle boxes should not blind in dark */
+    [data-bs-theme="dark"] .bg-warning-subtle,
+    [data-bs-theme="dark"] .bg-success-subtle,
+    [data-bs-theme="dark"] .bg-danger-subtle {
+        filter: saturate(.9) brightness(.95);
+    }
+</style>
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="mb-0">Settings</h3>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+    {
+        <div class="alert alert-success">@Model.SuccessMessage</div>
+    }
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link @(isProfile ? "active" : "")" href="@Url.Action("Settings", "Home", new { tab = "profile" })">
+                <i class="bi bi-person-circle me-1"></i> Profile
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(isPassword ? "active" : "")" href="@Url.Action("Settings", "Home", new { tab = "password" })">
+                <i class="bi bi-shield-lock me-1"></i> Password
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(isFinance ? "active" : "")" href="@Url.Action("Settings", "Home", new { tab = "finance" })">
+                <i class="bi bi-cash-coin me-1"></i> Finance
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(isAudit ? "active" : "")" href="@Url.Action("Settings", "Home", new { tab = "audit" })">
+                <i class="bi bi-journal-text me-1"></i> Audit Log
+            </a>
+        </li>
+    </ul>
+
+    @* ===================== PROFILE ===================== *@
+    @if (isProfile)
+    {
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <div class="fw-semibold">Profile Details</div>
+                <div class="text-muted small">Update FullName and Phone</div>
+            </div>
+            <div class="card-body">
+                <form asp-action="UpdateProfile" asp-controller="Home" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+
+                    <input type="hidden" asp-for="ActiveTab" value="profile" />
+
+                    <div class="col-md-6">
+                        <label class="form-label">Username</label>
+                        <input class="form-control" value="@Model.Username" readonly />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Role</label>
+                        <input class="form-control" value="@(Model.RoleText == "staff" ? "Company" : Model.RoleText)" readonly />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="FullName" class="form-label">Full Name</label>
+                        <input asp-for="FullName" class="form-control" maxlength="150" placeholder="Your full name" />
+                        <span asp-validation-for="FullName" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="Phone" class="form-label">Phone</label>
+                        <input asp-for="Phone" class="form-control" maxlength="30" placeholder="e.g. 01xxxxxxxxx" />
+                        <span asp-validation-for="Phone" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-12 d-flex justify-content-end">
+                        <button class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
+    @* ===================== PASSWORD ===================== *@
+    @if (isPassword)
+    {
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <div class="fw-semibold">Change Password</div>
+                <div class="text-muted small">Enter current password then new password</div>
+            </div>
+            <div class="card-body">
+                <form asp-action="ChangePassword" asp-controller="Home" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+
+                    <input type="hidden" asp-for="ActiveTab" value="password" />
+
+                    <div class="col-md-4">
+                        <label asp-for="Password.CurrentPassword" class="form-label">Current Password</label>
+                        <input asp-for="Password.CurrentPassword" type="password" class="form-control" autocomplete="current-password" />
+                        <span asp-validation-for="Password.CurrentPassword" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label asp-for="Password.NewPassword" class="form-label">New Password</label>
+                        <input asp-for="Password.NewPassword" type="password" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="Password.NewPassword" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label asp-for="Password.ConfirmNewPassword" class="form-label">Confirm New Password</label>
+                        <input asp-for="Password.ConfirmNewPassword" type="password" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="Password.ConfirmNewPassword" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-12 d-flex justify-content-end">
+                        <button class="btn btn-warning">
+                            <i class="bi bi-key me-1"></i> Update Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
+    @* ===================== FINANCE ===================== *@
+    @if (isFinance)
+    {
+        <!-- Search -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <form method="get" action="@Url.Action("Settings","Home")" class="row g-2 align-items-end">
+                    <input type="hidden" name="tab" value="finance" />
+
+                    <div class="col-md-3">
+                        <label class="form-label mb-1">From</label>
+                        <input type="date" class="form-control form-control-sm" name="from" value="@fFrom" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label mb-1">To</label>
+                        <input type="date" class="form-control form-control-sm" name="to" value="@fTo" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label mb-1">Search (name / phone / method pay)</label>
+                        <input class="form-control form-control-sm" name="q" value="@fQ" placeholder="e.g. 010..., Ahmed, Cash" />
+                    </div>
+
+                    <div class="col-md-2 search-actions d-flex gap-2">
+                        <button class="btn btn-primary btn-sm w-100 h-100">
+                            <i class="bi bi-search me-1"></i> Search
+                        </button>
+                        <a class="btn btn-outline-secondary btn-sm w-100 h-100" href="@Url.Action("Settings", "Home", new { tab = "finance" })">
+                            Reset
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Summary Cards (CENTERED) -->
+        <div class="row g-3 mb-3 justify-content-center">
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="border border-warning rounded p-3 bg-warning-subtle mx-auto" style="max-width:520px;">
+                    <div class="text-muted small">Total Booking</div>
+                    <div class="fs-3 fw-bold">@Money(cardTotalDue)</div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="border border-success rounded p-3 bg-success-subtle mx-auto" style="max-width:520px;">
+                    <div class="text-muted small">Total Paid</div>
+                    <div class="fs-3 fw-bold">@Money(cardTotalPaid)</div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="border border-danger rounded p-3 bg-danger-subtle mx-auto" style="max-width:520px;">
+                    <div class="text-muted small">Remaining</div>
+                    <div class="fs-3 fw-bold">@Money(cardRemaining)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2 columns: Bookings / Collections -->
+        <div class="row g-3">
+            <!-- Bookings -->
+            <div class="col-lg-7">
+                <div class="card shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="fw-semibold">Bookings</div>
+                        <div class="text-muted small">Count: @cardBookingsCount</div>
+                    </div>
+                    <div class="card-body">
+                        @if (Model.FinanceBookings == null || Model.FinanceBookings.Count == 0)
+                        {
+                            <div class="text-muted">No bookings match your search.</div>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-2">
+                                @foreach (var b in Model.FinanceBookings)
+                                {
+                                    var badgeText = b.IsCanceled ? "Canceled" : "Booked";
+                                    var badgeCls = b.IsCanceled ? "bg-danger" : "bg-success";
+
+                                    <div class="border rounded p-3">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div>
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <span class="badge @badgeCls">@badgeText</span>
+                                                    <div class="fw-semibold">@b.CustomerName</div>
+                                                </div>
+                                                <div class="text-muted small">
+                                                    <span class="me-2"><i class="bi bi-telephone"></i> @b.CustomerPhone</span>
+                                                    <span class="me-2">•</span>
+                                                    <span>@b.CreatedAtText</span>
+                                                </div>
+
+                                                @if (b.IsCanceled)
+                                                {
+                                                    <div class="text-danger small mt-1">
+                                                        <i class="bi bi-x-circle me-1"></i> This booking is canceled.
+                                                    </div>
+                                                }
+                                            </div>
+
+                                            <div class="text-end">
+                                                <div class="text-muted small">Total</div>
+                                                <div class="fs-5 fw-bold">@Money(b.TotalAmount)</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collections -->
+            <div class="col-lg-5">
+                <div class="card shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="fw-semibold">Collections</div>
+                        <div class="text-muted small">Count: @cardCollectionsCount</div>
+                    </div>
+                    <div class="card-body">
+                        @if (Model.RecentCollections == null || Model.RecentCollections.Count == 0)
+                        {
+                            <div class="text-muted">No collections match your search.</div>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-2">
+                                @foreach (var c in Model.RecentCollections)
+                                {
+                                    <div class="border rounded p-3">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="fw-semibold">@Money(c.Amount)</div>
+                                            <div class="text-muted small">@c.CollectedAtText</div>
+                                        </div>
+                                        <div class="text-muted small mt-1">
+                                            <div>@c.CustomerName</div>
+                                            <div>@c.CustomerPhone • @c.Method</div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ===================== AUDIT LOG ===================== *@
+    @if (isAudit)
+    {
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                @* ✅ FIXED: buttons small + same height + same line *@
+                <form method="get" action="@Url.Action("Settings","Home")" class="row g-2 align-items-end">
+                    <input type="hidden" name="tab" value="audit" />
+
+                    <div class="col-md-3">
+                        <label class="form-label mb-1">From</label>
+                        <input type="date" class="form-control form-control-sm" name="auditFrom" value="@(Model.AuditFrom ?? "")" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label mb-1">To</label>
+                        <input type="date" class="form-control form-control-sm" name="auditTo" value="@(Model.AuditTo ?? "")" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label mb-1">Action</label>
+                        <input class="form-control form-control-sm" name="auditAction" value="@(Model.AuditAction ?? "")"
+                               placeholder="e.g. login, change_password, update_profile" />
+                    </div>
+
+                    <div class="col-md-2 search-actions">
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-sm w-100 h-100">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                            <a class="btn btn-outline-secondary btn-sm w-100 h-100"
+                               href="@Url.Action("Settings", "Home", new { tab = "audit" })">
+                                Reset
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="fw-semibold">Audit Log</div>
+                    <div class="text-muted small">
+                        @if (string.IsNullOrWhiteSpace(Model.AuditFrom) && string.IsNullOrWhiteSpace(Model.AuditTo) && string.IsNullOrWhiteSpace(Model.AuditAction))
+                        {
+                            <span>Latest 50 actions done by you</span>
+                        }
+                        else
+                        {
+                            <span>Filtered results</span>
+                        }
+                    </div>
+                </div>
+                <div class="text-muted small">Rows: @(Model.AuditLogs?.Count ?? 0)</div>
+            </div>
+
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:180px;">Date</th>
+                                <th style="width:170px;">Action</th>
+                                <th style="width:140px;">Entity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.AuditLogs == null || Model.AuditLogs.Count == 0)
+                            {
+                                <tr><td colspan="3" class="text-muted p-3">No logs.</td></tr>
+                            }
+                            else
+                            {
+                                foreach (var l in Model.AuditLogs)
+                                {
+                                    <tr>
+                                        <td class="text-nowrap">@l.CreatedAtText</td>
+                                        <td class="fw-semibold">@l.Action</td>
+                                        <td>@l.Entity</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

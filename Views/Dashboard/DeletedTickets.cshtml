@@ -1,0 +1,99 @@
+﻿@model List<NoufirTours.Data.DeletedTicket>
+
+@{
+    ViewData["Title"] = "Deleted Tickets";
+}
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h3 class="mb-1">Deleted Tickets</h3>
+            <div class="text-muted">Archived deleted tickets list</div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="/Dashboard/Index" class="btn btn-outline-secondary">Back to Dashboard</a>
+        </div>
+    </div>
+
+    <form method="get" action="/Dashboard/DeletedTickets" class="mb-3">
+        <div class="row g-2">
+            <div class="col-md-8">
+                <input type="text"
+                       name="q"
+                       value="@(Context.Request.Query["q"])"
+                       class="form-control"
+                       placeholder="Search by code, customer, phone, company, trip..." />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" type="submit">Search</button>
+            </div>
+            <div class="col-md-2">
+                <a href="/Dashboard/DeletedTickets" class="btn btn-outline-secondary w-100">Reset</a>
+            </div>
+        </div>
+    </form>
+
+    @if (Model == null || Model.Count == 0)
+    {
+        <div class="alert alert-info mb-0">
+            No deleted tickets found.
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Code</th>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Company</th>
+                                <th>Trip</th>
+                                <th>Date</th>
+                                <th>Route</th>
+                                <th>Seats</th>
+                                <th>Total</th>
+                                <th>Deleted At</th>
+                                <th>Deleted By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var x in Model)
+                            {
+                                var deletedAt = DateTimeOffset.FromUnixTimeSeconds(x.DeletedAtUnix).LocalDateTime;
+
+                                <tr>
+                                    <td class="fw-semibold">@(x.TicketCode ?? "-")</td>
+                                    <td>@(x.CustomerName ?? "-")</td>
+                                    <td>@(x.Phone ?? "-")</td>
+                                    <td>@(x.CompanyFrom ?? "-")</td>
+                                    <td>@(x.TripName ?? "-")</td>
+                                    <td>@(x.TripDepartDate ?? "-")</td>
+                                    <td>
+                                        <span>@(x.TripFromCity ?? "-")</span>
+                                        <span class="mx-1">→</span>
+                                        <span>@(x.TripToCity ?? "-")</span>
+                                    </td>
+                                    <td>
+                                        <div>@(x.SeatsText ?? "-")</div>
+                                        @if (!string.IsNullOrWhiteSpace(x.SeatsReturnText))
+                                        {
+                                            <div class="text-muted small">Return: @x.SeatsReturnText</div>
+                                        }
+                                    </td>
+                                    <td>@x.TotalAmount.ToString("0.##")</td>
+                                    <td>@deletedAt.ToString("yyyy/MM/dd HH:mm")</td>
+                                    <td>@(x.DeletedByUser?.Username ?? "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>

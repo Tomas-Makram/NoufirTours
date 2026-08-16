@@ -1,0 +1,915 @@
+﻿@model NoufirTours.Models.Trips.Trips.TripCreateEditModel
+
+@{
+    ViewData["Title"] = "Create New Trip";
+    var tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
+    var selectedDate = (!string.IsNullOrWhiteSpace(Model?.DepartDate)) ? Model.DepartDate : tomorrow;
+    var nonce = Context.Items["CSPNonce"]?.ToString();
+
+    // Default map center (if coords not set)
+    var defaultLat = (Model?.PickupLat ?? 27.180824m);
+    var defaultLon = (Model?.PickupLon ?? 31.189725m);
+
+    // Default text (keep it as you want)
+    var defaultPickupText = string.IsNullOrWhiteSpace(Model?.PickupPlace)
+        ? "First El-Helaly at Go Bus Company"
+        : Model!.PickupPlace;
+}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="mb-0">@ViewData["Title"]</h3>
+            <small class="text-muted">Select available bus and driver</small>
+        </div>
+        <a asp-action="Trips" class="btn btn-outline-secondary">
+            Back to List
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <form asp-action="CreateNewTrip" method="post" id="tripForm">
+                @Html.AntiForgeryToken()
+
+                <!-- ✅ NAME + DATE + TIME -->
+                <div class="row mb-3 g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label asp-for="TripName" class="form-label fw-bold">Trip Name</label>
+                        <input asp-for="TripName" class="form-control" placeholder="Trip-1" />
+                        <span asp-validation-for="TripName" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label asp-for="DepartDate" class="form-label fw-bold">Depart Date</label>
+
+                        <!-- ✅ إضافة بسيطة: Wrapper علشان نحط Refresh جنب التاريخ -->
+                        <div class="d-flex gap-2">
+                            <input asp-for="DepartDate"
+                                   type="date"
+                                   class="form-control"
+                                   value="@selectedDate"
+                                   id="departDate" />
+
+                            <!-- ✅ زر Refresh -->
+                            <button type="button" class="btn btn-outline-primary" id="btnRefreshAvailability" title="Refresh availability">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </button>
+                        </div>
+
+                        <span asp-validation-for="DepartDate" class="text-danger"></span>
+
+                        <!-- ✅ Status صغير -->
+                        <div class="small text-muted mt-1" id="availStatus" style="display:none;"></div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label asp-for="DepartTime" class="form-label fw-bold">Depart Time</label>
+                        <input asp-for="DepartTime" type="time" class="form-control" value="05:00" />
+                        <span asp-validation-for="DepartTime" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <hr />
+
+                <!-- ✅ نوع الرحلة (Go / Return / Round) -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Trip Type</label>
+                    <div class="d-flex gap-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" asp-for="PriceType" value="1" id="priceTypeGo">
+                            <label class="form-check-label" for="priceTypeGo">
+                                <i class="bi bi-arrow-right"></i> Go Only
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" asp-for="PriceType" value="2" id="priceTypeReturn">
+                            <label class="form-check-label" for="priceTypeReturn">
+                                <i class="bi bi-arrow-left"></i> Return Only
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" asp-for="PriceType" value="3" id="priceTypeRound" checked>
+                            <label class="form-check-label" for="priceTypeRound">
+                                <i class="bi bi-arrow-left-right"></i> Round Trip
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ✅ PRICES - Dynamic based on selection -->
+                <div class="row mb-3 g-3" id="priceFields">
+                    <!-- Go Price Field (يظهر في Go و Round) -->
+                    <div class="col-md-4 price-field" id="fieldGoPrice">
+                        <label asp-for="SeatPriceGo" class="form-label fw-bold">Seat Price Go</label>
+                        <input asp-for="SeatPriceGo" type="number" class="form-control" step="0.01" min="0" />
+                        <span asp-validation-for="SeatPriceGo" class="text-danger"></span>
+                    </div>
+
+                    <!-- Return Price Field (يظهر في Return و Round) -->
+                    <div class="col-md-4 price-field" id="fieldReturnPrice">
+                        <label asp-for="SeatPriceReturn" class="form-label fw-bold">Seat Price Return</label>
+                        <input asp-for="SeatPriceReturn" type="number" class="form-control" step="0.01" min="0" />
+                        <span asp-validation-for="SeatPriceReturn" class="text-danger"></span>
+                    </div>
+
+                    <!-- Round Price Field (يظهر فقط في Round) -->
+                </div>
+
+                <!-- ✅ BUS -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Bus</label>
+
+                    <div class="input-group">
+                        <select asp-for="BusId"
+                                asp-items="ViewBag.AvailableBuses"
+                                class="form-select"
+                                id="busSelect">
+                            <option value="">-- Select Bus --</option>
+                        </select>
+
+                        <button type="button" class="btn btn-outline-primary" id="busDetailsBtn">
+                            Details
+                        </button>
+                    </div>
+
+                    <span asp-validation-for="BusId" class="text-danger"></span>
+                    <div id="busSummary" class="small text-muted mt-2" style="display:none;"></div>
+                </div>
+
+                <!-- ✅ DRIVER -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Driver</label>
+
+                    <div class="input-group">
+                        <select asp-for="DriverId"
+                                asp-items="ViewBag.AvailableDrivers"
+                                class="form-select"
+                                id="driverSelect">
+                            <option value="">-- Select Driver --</option>
+                        </select>
+
+                        <button type="button" class="btn btn-outline-success" id="driverDetailsBtn">
+                            Details
+                        </button>
+                    </div>
+
+                    <span asp-validation-for="DriverId" class="text-danger"></span>
+                    <div id="driverSummary" class="small text-muted mt-2" style="display:none;"></div>
+                </div>
+
+                <!-- ✅ CITIES -->
+                <div class="row mb-3 g-3">
+                    <div class="col-md-6">
+                        <label asp-for="FromCity" class="form-label fw-bold">From City</label>
+                        <input asp-for="FromCity" class="form-control" value="Asyut" />
+                        <span asp-validation-for="FromCity" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="ToCity" class="form-label fw-bold">To City</label>
+                        <input asp-for="ToCity" class="form-control" value="Hurgada" />
+                        <span asp-validation-for="ToCity" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <!-- ✅ PICKUP LOCATION -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Pickup Location</label>
+
+                    <div class="border rounded p-3">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold mb-1">Pickup Place (Text)</label>
+                                <input asp-for="PickupPlace"
+                                       class="form-control"
+                                       id="PickupPlace"
+                                       value="@defaultPickupText"
+                                       placeholder="Pickup place text" />
+                                <span asp-validation-for="PickupPlace" class="text-danger"></span>
+
+                                <div class="form-text">
+                                    Coordinates will be selected from the popup. Text stays as you want (can be edited).
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 text-md-end">
+                                <button type="button" class="btn btn-primary w-100" id="btnOpenLocationModal">
+                                    <i class="bi bi-geo-alt me-1"></i> Use GPS / Choose Location
+                                </button>
+                                <div class="small text-muted mt-2" id="pickupMiniInfo"></div>
+                            </div>
+                        </div>
+
+                        <!-- Hidden fields saved from modal -->
+                        <input type="hidden" asp-for="PickupLat" id="PickupLat" />
+                        <input type="hidden" asp-for="PickupLon" id="PickupLon" />
+
+                        <!-- validation message for coords -->
+                        <div class="mt-2">
+                            <span class="text-danger small" id="coordValidation" style="display:none;">
+                                Please select pickup location (Lat/Lon).
+                            </span>
+                            <span asp-validation-for="PickupLat" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ✅ NOTES -->
+                <div class="mb-3">
+                    <label asp-for="Notes" class="form-label fw-bold"></label>
+                    <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                    <span asp-validation-for="Notes" class="text-danger"></span>
+                </div>
+
+                <input type="hidden" asp-for="IsArchivedInt" value="0" />
+
+                <button type="submit" class="btn btn-primary">
+                    Save Trip
+                </button>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- ========================= BUS MODAL ========================= -->
+<div class="modal fade" id="busModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Bus Details</h5>
+                    <small class="opacity-75">Full information about selected bus</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="busModalBody">Loading...</div>
+            <div class="modal-footer">
+                <a class="btn btn-warning me-auto" id="busEditLink" href="#" style="display:none;">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= DRIVER MODAL ========================= -->
+<div class="modal fade" id="driverModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <div>
+                    <h5 class="modal-title mb-0">Driver Details</h5>
+                    <small class="opacity-75">Full information about selected driver</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="driverModalBody">Loading...</div>
+            <div class="modal-footer">
+                <a class="btn btn-warning me-auto" id="driverEditLink" href="#" style="display:none;">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= LOCATION MODAL ========================= -->
+<div class="modal fade" id="locationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <div class="modal-header bg-dark text-white">
+                <div>
+                    <h5 class="modal-title mb-0"><i class="bi bi-geo-alt"></i> Choose Pickup Location</h5>
+                    <small class="opacity-75">Search, GPS, or click the map then Save</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <div class="row g-3">
+                    <!-- Left: controls -->
+                    <div class="col-lg-4">
+                        <div class="border rounded p-3 h-100">
+
+                            <div class="d-flex gap-2 flex-wrap mb-2">
+                                <button type="button" class="btn btn-primary" id="btnGpsInsideModal">
+                                    <i class="bi bi-crosshair2"></i> Use GPS
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="btnClearInsideModal">
+                                    <i class="bi bi-x-circle"></i> Clear
+                                </button>
+                            </div>
+
+                            <div class="small text-muted mb-3" id="locationModalStatus">
+                                Search place or click on map.
+                            </div>
+
+                            <label class="form-label fw-bold mb-1">Search Place</label>
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" id="txtPlaceSearchModal"
+                                       placeholder="Cairo, أسيوط, شارع..." autocomplete="off" />
+                                <button type="button" class="btn btn-outline-primary" id="btnPlaceSearchModal">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+
+                            <div class="form-text small mb-2" id="searchStatusModal">
+                                Type and press Search.
+                            </div>
+
+                            <div id="searchResultsWrapModal" style="display:none;">
+                                <div class="small fw-semibold mb-1">Results</div>
+                                <div class="list-group" id="searchResultsModal"></div>
+                            </div>
+
+                            <div class="alert alert-warning mt-2 py-2" id="searchErrorModal" style="display:none;">
+                                <div class="small" id="searchErrorTextModal"></div>
+                            </div>
+
+                            <hr />
+
+                            <label class="form-label fw-bold mb-1">Lat / Lon</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input class="form-control" id="tmpLat" placeholder="Lat" />
+                                </div>
+                                <div class="col-6">
+                                    <input class="form-control" id="tmpLng" placeholder="Lng" />
+                                </div>
+                            </div>
+
+                            <div class="small text-muted mt-2" id="tmpCoordsText"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right: map -->
+                    <div class="col-lg-8">
+                        <div id="mapModal" class="map-box"></div>
+
+                        <div class="mt-2 p-2 rounded selected-box">
+                            <div class="small fw-semibold mb-1">Selected</div>
+                            <div class="small text-muted" id="selectedDetailsModal">No selection yet.</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="btnSaveLocation">
+                    <i class="bi bi-check2-circle me-1"></i> Save Location
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <!-- ✅ Leaflet (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script nonce="@nonce" src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <script nonce="@nonce">
+        document.addEventListener("DOMContentLoaded", function () {
+
+        // =========================
+        // Price Fields Logic
+        // =========================
+        const priceTypeGo = document.getElementById('priceTypeGo');
+        const priceTypeReturn = document.getElementById('priceTypeReturn');
+        const priceTypeRound = document.getElementById('priceTypeRound');
+
+        const fieldGoPrice = document.getElementById('fieldGoPrice');
+        const fieldReturnPrice = document.getElementById('fieldReturnPrice');
+        const fieldRoundPrice = document.getElementById('fieldRoundPrice'); // ممكن يكون null
+
+        function setInputValueIfExists(selector, val) {
+            const el = document.querySelector(selector);
+            if (el) el.value = val;
+        }
+
+        function setDisplayIfExists(el, display) {
+            if (el) el.style.display = display;
+        }
+
+        function updatePriceFields() {
+            // تأمين: لو الراديوهات مش موجودة لأي سبب
+            if (!priceTypeGo || !priceTypeReturn || !priceTypeRound) return;
+
+            if (priceTypeGo.checked) {
+                // Go only
+                setDisplayIfExists(fieldGoPrice, 'block');
+                setDisplayIfExists(fieldReturnPrice, 'none');
+                setDisplayIfExists(fieldRoundPrice, 'none');
+
+                // إلغاء قيم الحقول غير الموجودة/المخفية بدون Errors
+                setInputValueIfExists('[name="SeatPriceReturn"]', '');
+                setInputValueIfExists('[name="SeatPriceRound"]', '');
+            }
+            else if (priceTypeReturn.checked) {
+                // Return only
+                setDisplayIfExists(fieldGoPrice, 'none');
+                setDisplayIfExists(fieldReturnPrice, 'block');
+                setDisplayIfExists(fieldRoundPrice, 'none');
+
+                setInputValueIfExists('[name="SeatPriceGo"]', '');
+                setInputValueIfExists('[name="SeatPriceRound"]', '');
+            }
+            else if (priceTypeRound.checked) {
+                // Round trip
+                setDisplayIfExists(fieldGoPrice, 'block');
+                setDisplayIfExists(fieldReturnPrice, 'block');
+                // لو Round field مش موجود، خلاص مش هنعمل style عليه
+                setDisplayIfExists(fieldRoundPrice, 'block');
+            }
+        }
+
+        // Add event listeners (بأمان)
+        priceTypeGo?.addEventListener('change', updatePriceFields);
+        priceTypeReturn?.addEventListener('change', updatePriceFields);
+        priceTypeRound?.addEventListener('change', updatePriceFields);
+
+        // Initial update
+        updatePriceFields();
+
+            // =========================
+            // Modals (Bus/Driver)
+            // =========================
+            const busModal = new bootstrap.Modal(document.getElementById('busModal'));
+            const driverModal = new bootstrap.Modal(document.getElementById('driverModal'));
+            const locationModal = new bootstrap.Modal(document.getElementById('locationModal'));
+
+            const busSelect = document.getElementById("busSelect");
+            const driverSelect = document.getElementById("driverSelect");
+            const busSummary = document.getElementById("busSummary");
+            const driverSummary = document.getElementById("driverSummary");
+
+            async function fetchHtml(url) {
+                try {
+                    const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+                    if (!res.ok) return null;
+                    return await res.text();
+                } catch { return null; }
+            }
+
+            function optionText(selectEl) {
+                const opt = selectEl?.options?.[selectEl.selectedIndex];
+                return opt ? (opt.text || "") : "";
+            }
+
+            busSelect?.addEventListener("change", function () {
+                if (!this.value) { busSummary.style.display = "none"; return; }
+                busSummary.innerHTML = `<b>Selected:</b> ${optionText(busSelect)}`;
+                busSummary.style.display = "block";
+            });
+
+            driverSelect?.addEventListener("change", function () {
+                if (!this.value) { driverSummary.style.display = "none"; return; }
+                driverSummary.innerHTML = `<b>Selected:</b> ${optionText(driverSelect)}`;
+                driverSummary.style.display = "block";
+            });
+
+            document.getElementById("busDetailsBtn")?.addEventListener("click", async function () {
+                const id = busSelect.value;
+                document.getElementById("busModalBody").innerHTML = "Loading...";
+                const html = await fetchHtml(`/Trips/BusDetailsModal?id=${encodeURIComponent(id)}`);
+                if (!html) { document.getElementById("busModalBody").innerHTML = "Failed to load."; return; }
+                document.getElementById("busModalBody").innerHTML = html;
+                const editLink = document.getElementById("busEditLink");
+                editLink.href = `/Trips/EditBus?id=${encodeURIComponent(id)}`;
+                editLink.style.display = "inline-block";
+                busModal.show();
+            });
+
+            document.getElementById("driverDetailsBtn")?.addEventListener("click", async function () {
+                const id = driverSelect.value;
+                document.getElementById("driverModalBody").innerHTML = "Loading...";
+                const html = await fetchHtml(`/Trips/DriverDetailsModal?id=${encodeURIComponent(id)}`);
+                if (!html) { document.getElementById("driverModalBody").innerHTML = "Failed to load."; return; }
+                document.getElementById("driverModalBody").innerHTML = html;
+                const editLink = document.getElementById("driverEditLink");
+                editLink.href = `/Trips/EditDriver?id=${encodeURIComponent(id)}`;
+                editLink.style.display = "inline-block";
+                driverModal.show();
+            });
+
+            // =========================
+            // ✅ NEW: Availability Refresh Logic (by DepartDate)
+            // =========================
+            const departDate = document.getElementById('departDate');
+            const btnRefreshAvailability = document.getElementById('btnRefreshAvailability');
+            const availStatus = document.getElementById('availStatus');
+
+            function setAvailStatus(msg) {
+                if (!availStatus) return;
+                availStatus.textContent = msg || "";
+                availStatus.style.display = msg ? "" : "none";
+            }
+
+            function setSelectLoading(selectEl, isLoading) {
+                if (!selectEl) return;
+                selectEl.disabled = !!isLoading;
+                selectEl.classList.toggle('opacity-75', !!isLoading);
+            }
+
+            function rebuildSelect(selectEl, items, keepValue) {
+                if (!selectEl) return;
+
+                const prev = keepValue || "";
+                const firstOptText = (selectEl.id === "busSelect") ? "-- Select Bus --" : "-- Select Driver --";
+
+                selectEl.innerHTML = "";
+                const opt0 = document.createElement("option");
+                opt0.value = "";
+                opt0.textContent = firstOptText;
+                selectEl.appendChild(opt0);
+
+                (items || []).forEach(it => {
+                    const o = document.createElement("option");
+                    o.value = it.id;
+                    o.textContent = it.text;
+                    selectEl.appendChild(o);
+                });
+
+                // restore selection if still exists
+                if (prev && Array.from(selectEl.options).some(o => o.value === prev)) {
+                    selectEl.value = prev;
+                } else {
+                    selectEl.value = "";
+                }
+
+                // trigger summary update
+                if (selectEl === busSelect) {
+                    if (!selectEl.value) busSummary.style.display = "none";
+                    else { busSummary.innerHTML = `<b>Selected:</b> ${optionText(busSelect)}`; busSummary.style.display = "block"; }
+                }
+                if (selectEl === driverSelect) {
+                    if (!selectEl.value) driverSummary.style.display = "none";
+                    else { driverSummary.innerHTML = `<b>Selected:</b> ${optionText(driverSelect)}`; driverSummary.style.display = "block"; }
+                }
+            }
+
+            async function refreshAvailability() {
+                const d = (departDate?.value || "").trim();
+                if (!d) return;
+
+                const keepBus = busSelect?.value || "";
+                const keepDriver = driverSelect?.value || "";
+
+                setAvailStatus("Refreshing available buses/drivers...");
+                setSelectLoading(busSelect, true);
+                setSelectLoading(driverSelect, true);
+
+                try {
+                    const url = `/Trips/AvailabilityByDate?date=${encodeURIComponent(d)}`;
+                    const res = await fetch(url, { headers: { "Accept": "application/json" } });
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+
+                    const data = await res.json();
+
+                    rebuildSelect(busSelect, data.buses || [], keepBus);
+                    rebuildSelect(driverSelect, data.drivers || [], keepDriver);
+
+                    setAvailStatus(`Availability updated for ${data.date || d}.`);
+                    setTimeout(() => setAvailStatus(""), 1400);
+                } catch (err) {
+                    console.error(err);
+                    setAvailStatus("Failed to refresh availability. Check controller route /Trips/AvailabilityByDate.");
+                } finally {
+                    setSelectLoading(busSelect, false);
+                    setSelectLoading(driverSelect, false);
+                }
+            }
+
+            // ✅ auto refresh on date change
+            departDate?.addEventListener("change", refreshAvailability);
+
+            // ✅ manual refresh button
+            btnRefreshAvailability?.addEventListener("click", refreshAvailability);
+
+            // =========================
+            // Location Modal logic (YOUR ORIGINAL)
+            // =========================
+            const btnOpenLocationModal = document.getElementById('btnOpenLocationModal');
+            const pickupMiniInfo = document.getElementById('pickupMiniInfo');
+
+            const latInput = document.getElementById('PickupLat');
+            const lngInput = document.getElementById('PickupLon');
+            const coordValidation = document.getElementById('coordValidation');
+
+            // modal fields
+            const tmpLat = document.getElementById('tmpLat');
+            const tmpLng = document.getElementById('tmpLng');
+            const tmpCoordsText = document.getElementById('tmpCoordsText');
+            const selectedDetailsModal = document.getElementById('selectedDetailsModal');
+            const locationModalStatus = document.getElementById('locationModalStatus');
+
+            const txtPlaceSearchModal = document.getElementById('txtPlaceSearchModal');
+            const btnPlaceSearchModal = document.getElementById('btnPlaceSearchModal');
+            const searchStatusModal = document.getElementById('searchStatusModal');
+            const searchResultsWrapModal = document.getElementById('searchResultsWrapModal');
+            const searchResultsModal = document.getElementById('searchResultsModal');
+
+            const searchErrorModal = document.getElementById('searchErrorModal');
+            const searchErrorTextModal = document.getElementById('searchErrorTextModal');
+
+            const btnGpsInsideModal = document.getElementById('btnGpsInsideModal');
+            const btnClearInsideModal = document.getElementById('btnClearInsideModal');
+            const btnSaveLocation = document.getElementById('btnSaveLocation');
+
+            const defaultLat = @defaultLat.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            const defaultLng = @defaultLon.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            let map2 = null;
+            let marker2 = null;
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;')
+                    .replaceAll('"', '&quot;')
+                    .replaceAll("'", '&#039;');
+            }
+
+            function setUiErrorModal(msg) {
+                searchErrorTextModal.textContent = msg;
+                searchErrorModal.style.display = 'block';
+            }
+            function clearUiErrorModal() {
+                searchErrorModal.style.display = 'none';
+                searchErrorTextModal.textContent = '';
+            }
+
+            function setTmpLatLng(lat, lng, text) {
+                tmpLat.value = String(lat);
+                tmpLng.value = String(lng);
+                tmpCoordsText.textContent = `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+                if (text) selectedDetailsModal.textContent = text;
+                locationModalStatus.textContent = 'Location selected. Click Save.';
+            }
+
+            function initModalMapIfNeeded() {
+                if (map2) return;
+
+                map2 = L.map('mapModal', { zoomControl: true }).setView([defaultLat, defaultLng], 12);
+
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap &copy; CARTO'
+                }).addTo(map2);
+
+                marker2 = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map2);
+
+                map2.on('click', function (e) {
+                    clearUiErrorModal();
+                    marker2.setLatLng(e.latlng);
+                    setTmpLatLng(e.latlng.lat, e.latlng.lng, 'Selected by clicking the map.');
+                });
+
+                marker2.on('dragend', function () {
+                    clearUiErrorModal();
+                    const p = marker2.getLatLng();
+                    setTmpLatLng(p.lat, p.lng, 'Selected by dragging the pin.');
+                });
+            }
+
+            function syncModalFromMain() {
+                const curLat = parseFloat(latInput.value || '');
+                const curLng = parseFloat(lngInput.value || '');
+                if (!isNaN(curLat) && !isNaN(curLng)) {
+                    tmpLat.value = String(curLat);
+                    tmpLng.value = String(curLng);
+                    tmpCoordsText.textContent = `Lat: ${curLat.toFixed(6)} , Lng: ${curLng.toFixed(6)}`;
+                    selectedDetailsModal.textContent = 'Current saved pickup location.';
+                    locationModalStatus.textContent = 'You can adjust then Save.';
+
+                    if (map2 && marker2) {
+                        marker2.setLatLng([curLat, curLng]);
+                        map2.setView([curLat, curLng], 14);
+                    }
+                } else {
+                    tmpLat.value = String(defaultLat);
+                    tmpLng.value = String(defaultLng);
+                    tmpCoordsText.textContent = `Lat: ${defaultLat.toFixed(6)} , Lng: ${defaultLng.toFixed(6)}`;
+                    selectedDetailsModal.textContent = 'Default location loaded.';
+                }
+            }
+
+            btnOpenLocationModal?.addEventListener('click', function () {
+                locationModal.show();
+
+                setTimeout(() => {
+                    initModalMapIfNeeded();
+                    map2.invalidateSize();
+
+                    syncModalFromMain();
+
+                    const lat = parseFloat(tmpLat.value);
+                    const lng = parseFloat(tmpLng.value);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        marker2.setLatLng([lat, lng]);
+                        map2.setView([lat, lng], 14);
+                    }
+                }, 250);
+            });
+
+            btnGpsInsideModal?.addEventListener('click', function () {
+                clearUiErrorModal();
+
+                if (!navigator.geolocation) {
+                    locationModalStatus.textContent = 'GPS is not supported. Use search or click the map.';
+                    return;
+                }
+
+                btnGpsInsideModal.disabled = true;
+                locationModalStatus.textContent = 'Detecting GPS...';
+
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        try {
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
+
+                            marker2.setLatLng([lat, lng]);
+                            map2.setView([lat, lng], 17);
+                            setTmpLatLng(lat, lng, 'Selected by GPS.');
+                        } finally {
+                            btnGpsInsideModal.disabled = false;
+                        }
+                    },
+                    (err) => {
+                        btnGpsInsideModal.disabled = false;
+                        locationModalStatus.textContent = 'Could not use GPS. Use search or click the map.';
+                        console.log(err);
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+            });
+
+            btnClearInsideModal?.addEventListener('click', function () {
+                clearUiErrorModal();
+                tmpLat.value = '';
+                tmpLng.value = '';
+                tmpCoordsText.textContent = '';
+                selectedDetailsModal.textContent = 'No selection yet.';
+                locationModalStatus.textContent = 'Cleared. Search or click map.';
+                searchResultsWrapModal.style.display = 'none';
+            });
+
+            async function doSearchModal(query) {
+                clearUiErrorModal();
+
+                const q = (query || '').trim();
+                if (!q) {
+                    searchStatusModal.textContent = 'Type a place name then click Search.';
+                    searchResultsWrapModal.style.display = 'none';
+                    return;
+                }
+
+                searchStatusModal.textContent = 'Searching...';
+                btnPlaceSearchModal.disabled = true;
+                searchResultsWrapModal.style.display = 'none';
+                searchResultsModal.innerHTML = '';
+
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`;
+                    const res = await fetch(url, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json', 'Accept-Language': 'ar,en' }
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                    const data = await res.json();
+                    if (!Array.isArray(data) || data.length === 0) {
+                        searchStatusModal.textContent = 'No results. Try adding city/governorate.';
+                        return;
+                    }
+
+                    searchStatusModal.textContent = `Found ${data.length} results. Click one.`;
+                    searchResultsWrapModal.style.display = 'block';
+
+                    for (const item of data) {
+                        const lat = parseFloat(item.lat);
+                        const lng = parseFloat(item.lon);
+                        const display = item.display_name || 'Unknown';
+
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'list-group-item list-group-item-action';
+                        btn.innerHTML = `
+                            <div class="fw-semibold small">${escapeHtml(display)}</div>
+                            <div class="text-muted small">Lat: ${lat.toFixed(5)} , Lng: ${lng.toFixed(5)}</div>
+                        `;
+                        btn.addEventListener('click', function () {
+                            marker2.setLatLng([lat, lng]);
+                            map2.setView([lat, lng], 16);
+                            setTmpLatLng(lat, lng, display);
+                            searchResultsWrapModal.style.display = 'none';
+                        });
+
+                        searchResultsModal.appendChild(btn);
+                    }
+                }
+                catch (err) {
+                    console.error(err);
+                    searchStatusModal.textContent = 'Search failed.';
+                    setUiErrorModal('Search blocked (CORS/CSP) or rate-limited. Allow connect-src for nominatim or route via backend.');
+                }
+                finally {
+                    btnPlaceSearchModal.disabled = false;
+                }
+            }
+
+            btnPlaceSearchModal?.addEventListener('click', () => doSearchModal(txtPlaceSearchModal.value));
+            txtPlaceSearchModal?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); doSearchModal(txtPlaceSearchModal.value); }
+            });
+
+            btnSaveLocation?.addEventListener('click', function () {
+                const lat = parseFloat(tmpLat.value || '');
+                const lng = parseFloat(tmpLng.value || '');
+
+                if (isNaN(lat) || isNaN(lng)) {
+                    locationModalStatus.textContent = 'Please select valid Lat/Lon first.';
+                    return;
+                }
+
+                latInput.value = String(lat);
+                lngInput.value = String(lng);
+
+                coordValidation.style.display = 'none';
+                pickupMiniInfo.textContent = `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+
+                locationModal.hide();
+            });
+
+            if (latInput.value && lngInput.value) {
+                const lat = parseFloat(latInput.value);
+                const lng = parseFloat(lngInput.value);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    pickupMiniInfo.textContent = `Lat: ${lat.toFixed(6)} , Lng: ${lng.toFixed(6)}`;
+                }
+            }
+
+            const form = document.getElementById('tripForm');
+            form.addEventListener('submit', function (e) {
+                const lat = (latInput.value || '').trim();
+                const lng = (lngInput.value || '').trim();
+
+                if (!lat || !lng) {
+                    e.preventDefault();
+                    coordValidation.style.display = 'inline';
+                    document.getElementById('btnOpenLocationModal')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+
+                if (priceTypeGo.checked) {
+                    const goPrice = document.querySelector('[name="SeatPriceGo"]').value;
+
+                } else if (priceTypeReturn.checked) {
+                    const returnPrice = document.querySelector('[name="SeatPriceReturn"]').value;
+
+                } else if (priceTypeRound.checked) {
+                    const goPrice = document.querySelector('[name="SeatPriceGo"]').value;
+                    const returnPrice = document.querySelector('[name="SeatPriceReturn"]').value;
+                    const roundPrice = document.querySelector('[name="SeatPriceRound"]').value;
+                }
+            });
+
+            // ✅ OPTIONAL: initial refresh so it matches chosen date always
+            // (won't break anything)
+            refreshAvailability();
+
+        });
+    </script>
+
+    <style nonce="@nonce">
+        .map-box {
+            height: 520px;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid rgba(15,23,42,.10);
+        }
+
+        .selected-box {
+            background: rgba(248,250,252,.85);
+            border: 1px solid rgba(15,23,42,.08);
+        }
+
+        .price-field {
+            transition: all 0.3s ease;
+        }
+    </style>
+}

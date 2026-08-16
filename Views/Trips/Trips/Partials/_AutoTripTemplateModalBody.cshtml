@@ -1,0 +1,251 @@
+﻿@model NoufirTours.Models.Trips.Trips.AutoTripTemplateModalModel
+@using System.Globalization
+@using NoufirTours.Data
+
+@{
+    var defaultLat = 27.180824m;
+    var defaultLng = 31.189725m;
+
+    string Invariant(decimal? v) => v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : "";
+    string Safe(string? s) => (s ?? "").Trim();
+}
+
+<form id="autoTripEditorForm" method="post" asp-action="SaveAutoTripTemplateModal" asp-controller="Trips">
+    @Html.AntiForgeryToken()
+
+    <!-- Hidden fields -->
+    <input type="hidden" name="PlanId" id="edPlanId" value="@Model.PlanId" />
+    <input type="hidden" name="ItemId" id="edId" value="@(Model.ItemId?.ToString() ?? "")" />
+    <input type="hidden" name="OrderNo" id="edOrderNo" value="@Model.OrderNo" />
+    <input type="hidden" name="CheckDate" id="edCheckDate" value="@(Model.CheckDate ?? "")" />
+
+    <!-- Top strip -->
+    <div class="bg-info bg-opacity-25 border rounded p-3 mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <div class="fw-bold" id="edTitle">Template #@Model.OrderNo</div>
+            <div class="small text-muted" id="edDateText">
+                Date check: @(string.IsNullOrWhiteSpace(Model.CheckDate) ? "Not selected" : Model.CheckDate)
+            </div>
+
+            @if (!Model.IsAvailableForDate && !string.IsNullOrWhiteSpace(Model.CheckDate))
+            {
+                <div class="small text-danger mt-1">
+                    Unavailable: @(Model.UnavailableReason ?? "N/A")
+                </div>
+            }
+        </div>
+
+        <div class="d-flex align-items-center gap-4">
+            <input type="hidden" name="IsEnabled" value="false" />
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="edIsEnabled" name="IsEnabled" value="true"
+                       @(Model.IsEnabled ? "checked" : "") />
+                <label class="form-check-label" for="edIsEnabled">Enabled</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warning box -->
+    <div id="edWarningBox" class="alert alert-warning small" style="display:none;"></div>
+
+    <!-- Validation summary -->
+    <div class="text-danger small mb-2">
+        @Html.ValidationSummary(excludePropertyErrors: true)
+    </div>
+    <!-- Warning Details Box - تظهر عند وجود تحذيرات محددة -->
+    @if (ViewBag.WarningDetails != null && ((List<string>)ViewBag.WarningDetails).Count > 0)
+    {
+        <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+            <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Warning:</strong>
+            <ul class="mb-0 mt-2">
+                @foreach (var detail in (List<string>)ViewBag.WarningDetails)
+                {
+                    <li>@detail</li>
+                }
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    <!-- Main fields -->
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Trip Name</label>
+            <input class="form-control" id="edTripName" name="TripName" value="@Safe(Model.TripName)" />
+            <div class="text-danger small">@Html.ValidationMessage(nameof(Model.TripName))</div>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Depart Time</label>
+            <input class="form-control" type="time" id="edDepartTime" name="DepartTime" value="@Safe(Model.DepartTime)" />
+            <div class="text-danger small">@Html.ValidationMessage(nameof(Model.DepartTime))</div>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Route</label>
+            <div class="d-flex gap-2">
+                <input class="form-control" id="edFromCity" name="FromCity" value="@Safe(Model.FromCity)" placeholder="From" />
+                <input class="form-control" id="edToCity" name="ToCity" value="@Safe(Model.ToCity)" placeholder="To" />
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ Trip Type -->
+    <div class="mb-4">
+        <label class="form-label fw-bold">Trip Type</label>
+        <div class="d-flex gap-4">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="PriceType" value="1" id="priceTypeGo"
+                       @(Model.PriceType == TripPriceType.Go ? "checked" : "")>
+                <label class="form-check-label" for="priceTypeGo">
+                    <i class="bi bi-arrow-right"></i> Go Only
+                </label>
+            </div>
+            <!-- بعد كل حقل سعر، أضف هذا البلوك لإظهار التحذيرات -->
+            @if (ViewData.ModelState.ContainsKey("SeatPriceGo") && ViewData.ModelState["SeatPriceGo"]?.Errors.Count > 0)
+            {
+                <div class="text-danger small mt-1">
+                    <i class="bi bi-exclamation-circle me-1"></i>@Html.ValidationMessage("SeatPriceGo")
+                </div>
+            }
+
+           
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="PriceType" value="2" id="priceTypeReturn"
+                       @(Model.PriceType == TripPriceType.Return ? "checked" : "")>
+                <label class="form-check-label" for="priceTypeReturn">
+                    <i class="bi bi-arrow-left"></i> Return Only
+                </label>
+            </div>
+            @if (ViewData.ModelState.ContainsKey("SeatPriceReturn") && ViewData.ModelState["SeatPriceReturn"]?.Errors.Count > 0)
+            {
+                <div class="text-danger small mt-1">
+                    <i class="bi bi-exclamation-circle me-1"></i>@Html.ValidationMessage("SeatPriceReturn")
+                </div>
+            }
+
+            
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="PriceType" value="3" id="priceTypeRound"
+                       @(Model.PriceType == TripPriceType.Round ? "checked" : "")>
+                <label class="form-check-label" for="priceTypeRound">
+                    <i class="bi bi-arrow-left-right"></i> Round Trip
+                </label>
+            </div>
+            @if (ViewData.ModelState.ContainsKey("SeatPriceRound") && ViewData.ModelState["SeatPriceRound"]?.Errors.Count > 0)
+            {
+                <div class="text-danger small mt-1">
+                    <i class="bi bi-exclamation-circle me-1"></i>@Html.ValidationMessage("SeatPriceRound")
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- ✅ Prices - Dynamic based on selection -->
+    <div class="row mb-3 g-3" id="priceFields">
+        <!-- Go Price Field (يظهر في Go و Round) -->
+        <div class="col-md-4 price-field" id="fieldGoPrice" style="display: @(Model.PriceType == TripPriceType.Go || Model.PriceType == TripPriceType.Round ? "block" : "none")">
+            <label class="form-label fw-bold">Seat Price Go</label>
+            <input class="form-control" id="edSeatPriceGo" name="SeatPriceGo" type="number" step="0.01" min="0" value="@(Model.SeatPriceGo?.ToString() ?? "")" />
+        </div>
+
+        <!-- Return Price Field (يظهر في Return و Round) -->
+        <div class="col-md-4 price-field" id="fieldReturnPrice" style="display: @(Model.PriceType == TripPriceType.Return || Model.PriceType == TripPriceType.Round ? "block" : "none")">
+            <label class="form-label fw-bold">Seat Price Return</label>
+            <input class="form-control" id="edSeatPriceReturn" name="SeatPriceReturn" type="number" step="0.01" min="0" value="@(Model.SeatPriceReturn?.ToString() ?? "")" />
+        </div>
+
+        <!-- Round Price Field (يظهر فقط في Round) -->
+        <div class="col-md-4 price-field" id="fieldRoundPrice" style="display: @(Model.PriceType == TripPriceType.Round ? "block" : "none")">
+            <label type="hidden" class="form-label fw-bold">Round Trip Price</label>
+            <input type="hidden" class="form-control" id="edSeatPriceRound" name="SeatPriceRound" type="number" step="0.01" min="0" value="@(Model.SeatPriceRound?.ToString() ?? "")" />
+        </div>
+    </div>
+
+    <!-- Bus/Driver -->
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Bus (available only)</label>
+            <div class="input-group">
+                <select id="modalBusSelect" class="form-select" name="BusId">
+                    <option value="">-- Select Bus --</option>
+                    @foreach (var b in Model.Buses ?? new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                    {
+                        <option value="@b.Value" selected="@(b.Selected ? "selected" : null)">@b.Text</option>
+                    }
+                </select>
+                <button type="button" class="btn btn-outline-primary" id="modalBusDetailsBtn">Details</button>
+            </div>
+            <div class="text-danger small">@Html.ValidationMessage(nameof(Model.BusId))</div>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Driver (available only)</label>
+            <div class="input-group">
+                <select id="modalDriverSelect" class="form-select" name="DriverId">
+                    <option value="">-- Select Driver --</option>
+                    @foreach (var d in Model.Drivers ?? new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                    {
+                        <option value="@d.Value" selected="@(d.Selected ? "selected" : null)">@d.Text</option>
+                    }
+                </select>
+                <button type="button" class="btn btn-outline-success" id="modalDriverDetailsBtn">Details</button>
+            </div>
+            <div class="text-danger small">@Html.ValidationMessage(nameof(Model.DriverId))</div>
+        </div>
+    </div>
+
+    <!-- Pickup Location -->
+    <div class="mb-3">
+        <label class="form-label fw-bold">Pickup Location</label>
+
+        <div class="border rounded p-3">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label fw-bold mb-1">Pickup Place</label>
+                    <input id="modalPickupPlace"
+                           class="form-control"
+                           name="PickupPlace"
+                           value="@Safe(Model.PickupPlace)"
+                           placeholder="Pickup place text" />
+                </div>
+
+                <div class="col-md-4 text-md-end">
+                    <button type="button"
+                            class="btn btn-primary w-100"
+                            id="btnOpenTemplateLocation"
+                            data-default-lat="@defaultLat.ToString(CultureInfo.InvariantCulture)"
+                            data-default-lng="@defaultLng.ToString(CultureInfo.InvariantCulture)">
+                        <i class="bi bi-geo-alt me-1"></i> Use GPS / Choose Location
+                    </button>
+
+                    <div class="small text-muted mt-2" id="modalPickupMiniInfo">
+                        @if (Model.PickupLat.HasValue && Model.PickupLon.HasValue)
+                        {
+                            <text>Lat: @Model.PickupLat.Value.ToString("0.######", CultureInfo.InvariantCulture) , Lng: @Model.PickupLon.Value.ToString("0.######", CultureInfo.InvariantCulture)</text>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <input type="hidden" id="modalPickupLat" name="PickupLat" value="@Invariant(Model.PickupLat)" />
+            <input type="hidden" id="modalPickupLon" name="PickupLon" value="@Invariant(Model.PickupLon)" />
+        </div>
+
+        <div class="text-danger small mt-1">@Html.ValidationMessage(nameof(Model.PickupLat))</div>
+    </div>
+
+    <div class="row g-3 mb-2">
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Dropoff Place</label>
+            <input class="form-control" id="edDropoffPlace" name="DropoffPlace" value="@Safe(Model.DropoffPlace)" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Notes</label>
+            <input class="form-control" id="edNotes" name="Notes" value="@Safe(Model.Notes)" />
+        </div>
+    </div>
+
+    <!-- server error box -->
+    <div class="text-danger small" id="edServerError" style="display:none;"></div>
+</form>

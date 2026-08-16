@@ -1,0 +1,1564 @@
+﻿@using System.Globalization
+@using NoufirTours.Data
+@model NoufirTours.Models.Bookings.BookingDetailsModel
+
+@{
+    ViewData["Title"] = "Trip Booking";
+    var nonce = (Context.Items["CSPNonce"]?.ToString()) ?? "";
+
+    string Money(decimal v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    const int CELL = 46;
+    const int PAD = 4;
+
+    const int DOOR_THICK = 16;
+    const int DOOR_LEN = 38;
+    const int DOOR_GAP = 8;
+
+    bool IsSeat(NoufirTours.Models.Bookings.SeatCellModel c)
+        => (c.ElementType ?? "Seat").Equals("Seat", StringComparison.OrdinalIgnoreCase)
+           && !string.IsNullOrWhiteSpace(c.SeatCode);
+
+    bool IsWC(NoufirTours.Models.Bookings.SeatCellModel c)
+        => (c.ElementType ?? "").Equals("WC", StringComparison.OrdinalIgnoreCase);
+
+    bool IsAisle(NoufirTours.Models.Bookings.SeatCellModel c)
+        => (c.ElementType ?? "").Equals("Aisle", StringComparison.OrdinalIgnoreCase);
+
+    bool IsPassengerSelectableSeat(NoufirTours.Models.Bookings.SeatCellModel c, HashSet<string> unavailable)
+    {
+        if (!IsSeat(c)) return false;
+        var code = (c.SeatCode ?? "").Trim();
+        var role = (c.Role ?? "Passenger").Trim();
+        if (!c.IsActive) return false;
+        if (!c.IsSelectable) return false;
+        if (!role.Equals("Passenger", StringComparison.OrdinalIgnoreCase)) return false;
+        if (string.IsNullOrWhiteSpace(code)) return false;
+        if (unavailable?.Contains(code) ?? false) return false;
+        return true;
+    }
+
+    int ReadIntQS(string key, int fallback)
+    {
+        var s = Context.Request.Query[key].ToString();
+        if (int.TryParse(s, out var v) && v > 0) return v;
+        return fallback;
+    }
+
+    // المطلوب القادم من Index (QS)
+    var qsSeats = ReadIntQS("seats", 1);
+    var qsReturnSeats = ReadIntQS("returnSeats", 1);
+
+    // المتاح فعلاً في الباص/الباصين (Seats قابلة للاختيار وغير محجوزة)
+    var availMainSelectable = (Model.GridMain ?? new())
+        .Count(c => IsPassengerSelectableSeat(c, Model.UnavailableMain ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+
+    var availReturnSelectable = (Model.GridReturn ?? new())
+        .Count(c => IsPassengerSelectableSeat(c, Model.UnavailableReturn ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+
+    // القاعدة:
+    // - لازم يختار >= العدد اللي حدده في Index
+    // - لو المتاح أقل من المطلوب => لازم يختار كل المتاح
+    int requiredMain = Math.Max(1, Model.RequiredMainSeats);
+    int requiredReturn = Math.Max(1, Model.RequiredReturnSeats);
+    var isRound = Model.BookingMode == TripPriceType.Round;
+
+    string DoorOverlayStyle(int x, int y, int w, string? sideRaw, double? offsetRaw)
+    {
+        var side = (sideRaw ?? "").Trim().ToUpperInvariant();
+        if (side != "L" && side != "R" && side != "T" && side != "B")
+            side = (x <= 0) ? "L" : (x >= w - 1 ? "R" : (x >= (w / 2) ? "R" : "L"));
+
+        var offset = offsetRaw.HasValue ? Math.Clamp(offsetRaw.Value, 0.0, 1.0) : 0.5;
+
+        var cellLeft = x * CELL;
+        var cellTop = y * CELL;
+
+        int pxLeft, pxTop;
+        int wDoor, hDoor;
+
+        if (side == "L")
+        {
+            pxLeft = cellLeft - DOOR_THICK - DOOR_GAP;
+            pxTop = cellTop + (int)Math.Round((CELL - DOOR_LEN) * offset);
+            wDoor = DOOR_THICK; hDoor = DOOR_LEN;
+        }
+        else if (side == "R")
+        {
+            pxLeft = cellLeft + CELL + DOOR_GAP;
+            pxTop = cellTop + (int)Math.Round((CELL - DOOR_LEN) * offset);
+            wDoor = DOOR_THICK; hDoor = DOOR_LEN;
+        }
+        else if (side == "T")
+        {
+            pxLeft = cellLeft + (int)Math.Round((CELL - DOOR_LEN) * offset);
+            pxTop = cellTop - DOOR_THICK - DOOR_GAP;
+            wDoor = DOOR_LEN; hDoor = DOOR_THICK;
+        }
+        else
+        {
+            pxLeft = cellLeft + (int)Math.Round((CELL - DOOR_LEN) * offset);
+            pxTop = cellTop + CELL + DOOR_GAP;
+            wDoor = DOOR_LEN; hDoor = DOOR_THICK;
+        }
+
+        return $"left:{pxLeft}px; top:{pxTop}px; width:{wDoor}px; height:{hDoor}px;";
+    }
+
+    string ModeLabel =
+        Model.BookingMode == TripPriceType.Go ? "Go" :
+        Model.BookingMode == TripPriceType.Return ? "Return" :
+        "Round (Go + Return)";
+
+    // نص بسيط للمطلوب
+    string RequiredTextMain =
+        (availMainSelectable <= 0) ? "No selectable seats." :
+        (qsSeats > availMainSelectable)
+            ? $"Required: select ALL available seats ({availMainSelectable})."
+            : $"Required: select at least {requiredMain} seat(s).";
+
+    string RequiredTextReturn =
+        (availReturnSelectable <= 0) ? "No selectable seats." :
+        (qsReturnSeats > availReturnSelectable)
+            ? $"Required (Return): select ALL available seats ({availReturnSelectable})."
+            : $"Required: select at least {requiredReturn} seat(s).";
+}
+
+<style nonce="@nonce">
+    :root {
+        --bg-primary: #f6f8fc;
+        --bg-secondary: #eef2f7;
+        --bg-card: #ffffff;
+        --bg-bus-shell: #ffffff;
+        --bg-bus-interior: #ffffff;
+        --bg-legend: #ffffff;
+        --bg-alert-light: #ffffff;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #64748b;
+        --text-soft: #334155;
+        --border-color: rgba(15, 23, 42, 0.12);
+        --border-soft: rgba(15, 23, 42, 0.18);
+        --border-dashed: rgba(15, 23, 42, 0.20);
+        --grid-line: rgba(15, 23, 42, 0.06);
+        --shadow-color: rgba(2, 6, 23, 0.14);
+        --shadow-hover: rgba(2, 6, 23, 0.20);
+        --input-bg: #ffffff;
+        --input-text: #0f172a;
+        --input-border: rgba(15, 23, 42, 0.18);
+        --input-placeholder: rgba(71, 85, 105, 0.75);
+        --input-focus-border: rgba(37, 99, 235, 0.65);
+        --input-focus-shadow: rgba(37, 99, 235, 0.16);
+        --bus-shell-border: rgba(15, 23, 42, 0.82);
+        --bus-shell-gradient-start: rgba(15, 23, 42, .92);
+        --bus-shell-gradient-end: rgba(15, 23, 42, .66);
+        --door-bg: linear-gradient(145deg, #f59e0b, #fbbf24);
+        --door-border: #b45309;
+        --door-panel-bg: rgba(255, 255, 255, 0.22);
+        --door-panel-border: rgba(180, 83, 9, 0.65);
+        --door-shadow: rgba(180, 83, 9, 0.28);
+        --seat-available-bg: rgba(34, 197, 94, 0.14);
+        --seat-available-border: #16a34a;
+        --seat-available-text: #166534;
+        --seat-selected-bg: rgba(59, 130, 246, 0.16);
+        --seat-selected-border: #2563eb;
+        --seat-selected-text: #1d4ed8;
+        --seat-selected-outline: rgba(245, 158, 11, 0.95);
+        --seat-booked-bg: rgba(239, 68, 68, 0.14);
+        --seat-booked-border: #ef4444;
+        --seat-booked-text: #991b1b;
+        --seat-driver-bg: rgba(245, 158, 11, 0.18);
+        --seat-driver-border: #f59e0b;
+        --seat-driver-text: #92400e;
+        --seat-assistant-bg: rgba(168, 85, 247, 0.14);
+        --seat-assistant-border: #a855f7;
+        --seat-assistant-text: #6b21a8;
+        --seat-disabled-bg: rgba(148, 163, 184, 0.20);
+        --seat-disabled-border: rgba(148, 163, 184, 0.75);
+        --seat-disabled-text: #475569;
+        --wc-bg: radial-gradient(circle at 30% 30%, rgba(241,245,249,1), rgba(203,213,225,1));
+        --wc-border: rgba(15,23,42,0.75);
+        --wc-text: rgba(15,23,42,0.85);
+        --trip-summary-k: var(--text-muted);
+        --trip-summary-v: var(--text-primary);
+    }
+
+    @@media (prefers-color-scheme: dark) {
+        html:not([data-bs-theme="light"]):not([data-bs-theme="dark"]) {
+            --bg-primary: #0b1020;
+            --bg-secondary: #121a2e;
+            --bg-card: #111a2f;
+            --bg-bus-shell: #111a2f;
+            --bg-bus-interior: #0f172a;
+            --bg-legend: #111a2f;
+            --bg-alert-light: #0f172a;
+            --text-primary: #e5e7eb;
+            --text-secondary: #b6c0d0;
+            --text-muted: #94a3b8;
+            --text-soft: #cbd5e1;
+            --border-color: rgba(148, 163, 184, 0.18);
+            --border-soft: rgba(148, 163, 184, 0.22);
+            --border-dashed: rgba(148, 163, 184, 0.22);
+            --grid-line: rgba(226, 232, 240, 0.10);
+            --shadow-color: rgba(0, 0, 0, 0.45);
+            --shadow-hover: rgba(0, 0, 0, 0.55);
+            --input-bg: #0f172a;
+            --input-text: #e5e7eb;
+            --input-border: rgba(148, 163, 184, 0.28);
+            --input-placeholder: rgba(148, 163, 184, 0.70);
+            --input-focus-border: rgba(96, 165, 250, 0.70);
+            --input-focus-shadow: rgba(96, 165, 250, 0.18);
+            --bus-shell-border: rgba(2, 6, 23, 0.90);
+            --bus-shell-gradient-start: rgba(2, 6, 23, .96);
+            --bus-shell-gradient-end: rgba(2, 6, 23, .70);
+            --door-bg: linear-gradient(145deg, #b45309, #f59e0b);
+            --door-border: rgba(245, 158, 11, 0.60);
+            --door-panel-bg: rgba(255, 255, 255, 0.10);
+            --door-panel-border: rgba(245, 158, 11, 0.35);
+            --door-shadow: rgba(0, 0, 0, 0.35);
+            --seat-available-bg: rgba(34, 197, 94, 0.18);
+            --seat-available-border: rgba(34, 197, 94, 0.85);
+            --seat-available-text: rgba(134, 239, 172, 0.95);
+            --seat-selected-bg: rgba(59, 130, 246, 0.22);
+            --seat-selected-border: rgba(96, 165, 250, 0.95);
+            --seat-selected-text: rgba(147, 197, 253, 0.98);
+            --seat-selected-outline: rgba(245, 158, 11, 0.95);
+            --seat-booked-bg: rgba(239, 68, 68, 0.18);
+            --seat-booked-border: rgba(248, 113, 113, 0.95);
+            --seat-booked-text: rgba(254, 202, 202, 0.95);
+            --seat-driver-bg: rgba(245, 158, 11, 0.18);
+            --seat-driver-border: rgba(245, 158, 11, 0.90);
+            --seat-driver-text: rgba(253, 230, 138, 0.95);
+            --seat-assistant-bg: rgba(168, 85, 247, 0.18);
+            --seat-assistant-border: rgba(168, 85, 247, 0.95);
+            --seat-assistant-text: rgba(221, 214, 254, 0.95);
+            --seat-disabled-bg: rgba(148, 163, 184, 0.12);
+            --seat-disabled-border: rgba(148, 163, 184, 0.40);
+            --seat-disabled-text: rgba(148, 163, 184, 0.95);
+            --wc-bg: radial-gradient(circle at 30% 30%, rgba(51, 65, 85, 1), rgba(15, 23, 42, 1));
+            --wc-border: rgba(226, 232, 240, 0.35);
+            --wc-text: rgba(226, 232, 240, 0.75);
+            --trip-summary-k: var(--text-muted);
+            --trip-summary-v: var(--text-primary);
+        }
+    }
+
+    [data-bs-theme="light"] {
+        color-scheme: light;
+    }
+
+    [data-bs-theme="dark"] {
+        color-scheme: dark;
+    }
+
+    [data-bs-theme="dark"] {
+        --bg-primary: #0b1020;
+        --bg-secondary: #121a2e;
+        --bg-card: #111a2f;
+        --bg-bus-shell: #111a2f;
+        --bg-bus-interior: #0f172a;
+        --bg-legend: #111a2f;
+        --bg-alert-light: #0f172a;
+        --text-primary: #e5e7eb;
+        --text-secondary: #b6c0d0;
+        --text-muted: #94a3b8;
+        --text-soft: #cbd5e1;
+        --border-color: rgba(148, 163, 184, 0.18);
+        --border-soft: rgba(148, 163, 184, 0.22);
+        --border-dashed: rgba(148, 163, 184, 0.22);
+        --grid-line: rgba(226, 232, 240, 0.10);
+        --shadow-color: rgba(0, 0, 0, 0.45);
+        --shadow-hover: rgba(0, 0, 0, 0.55);
+        --input-bg: #0f172a;
+        --input-text: #e5e7eb;
+        --input-border: rgba(148, 163, 184, 0.28);
+        --input-placeholder: rgba(148, 163, 184, 0.70);
+        --input-focus-border: rgba(96, 165, 250, 0.70);
+        --input-focus-shadow: rgba(96, 165, 250, 0.18);
+        --bus-shell-border: rgba(2, 6, 23, 0.90);
+        --bus-shell-gradient-start: rgba(2, 6, 23, .96);
+        --bus-shell-gradient-end: rgba(2, 6, 23, .70);
+        --door-bg: linear-gradient(145deg, #b45309, #f59e0b);
+        --door-border: rgba(245, 158, 11, 0.60);
+        --door-panel-bg: rgba(255, 255, 255, 0.10);
+        --door-panel-border: rgba(245, 158, 11, 0.35);
+        --door-shadow: rgba(0, 0, 0, 0.35);
+        --seat-available-bg: rgba(34, 197, 94, 0.18);
+        --seat-available-border: rgba(34, 197, 94, 0.85);
+        --seat-available-text: rgba(134, 239, 172, 0.95);
+        --seat-selected-bg: rgba(59, 130, 246, 0.22);
+        --seat-selected-border: rgba(96, 165, 250, 0.95);
+        --seat-selected-text: rgba(147, 197, 253, 0.98);
+        --seat-selected-outline: rgba(245, 158, 11, 0.95);
+        --seat-booked-bg: rgba(239, 68, 68, 0.18);
+        --seat-booked-border: rgba(248, 113, 113, 0.95);
+        --seat-booked-text: rgba(254, 202, 202, 0.95);
+        --seat-driver-bg: rgba(245, 158, 11, 0.18);
+        --seat-driver-border: rgba(245, 158, 11, 0.90);
+        --seat-driver-text: rgba(253, 230, 138, 0.95);
+        --seat-assistant-bg: rgba(168, 85, 247, 0.18);
+        --seat-assistant-border: rgba(168, 85, 247, 0.95);
+        --seat-assistant-text: rgba(221, 214, 254, 0.95);
+        --seat-disabled-bg: rgba(148, 163, 184, 0.12);
+        --seat-disabled-border: rgba(148, 163, 184, 0.40);
+        --seat-disabled-text: rgba(148, 163, 184, 0.95);
+        --wc-bg: radial-gradient(circle at 30% 30%, rgba(51, 65, 85, 1), rgba(15, 23, 42, 1));
+        --wc-border: rgba(226, 232, 240, 0.35);
+        --wc-text: rgba(226, 232, 240, 0.75);
+        --trip-summary-k: var(--text-muted);
+        --trip-summary-v: var(--text-primary);
+    }
+
+    body {
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+        transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    .card, .card-body, .card-header {
+        background-color: var(--bg-card) !important;
+        color: var(--text-primary) !important;
+        border-color: var(--border-color) !important;
+    }
+
+        .card.shadow-sm {
+            box-shadow: 0 .5rem 1.2rem var(--shadow-color) !important;
+        }
+
+        .card-header.bg-white {
+            background-color: var(--bg-card) !important;
+            color: var(--text-primary) !important;
+            border-bottom-color: var(--border-color) !important;
+        }
+
+    .text-muted {
+        color: var(--text-muted) !important;
+    }
+
+    .alert.alert-light {
+        background: var(--bg-alert-light) !important;
+        color: var(--text-primary) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    .form-label {
+        color: var(--text-soft) !important;
+    }
+
+    .form-control, .form-select, textarea.form-control {
+        background-color: var(--input-bg) !important;
+        color: var(--input-text) !important;
+        border-color: var(--input-border) !important;
+        box-shadow: none !important;
+    }
+
+        .form-control::placeholder, textarea.form-control::placeholder {
+            color: var(--input-placeholder) !important;
+            opacity: 1;
+        }
+
+        .form-control:focus, .form-select:focus, textarea.form-control:focus {
+            background-color: var(--input-bg) !important;
+            color: var(--input-text) !important;
+            border-color: var(--input-focus-border) !important;
+            box-shadow: 0 0 0 .25rem var(--input-focus-shadow) !important;
+            outline: none !important;
+        }
+
+    .btn-outline-secondary {
+        color: var(--text-primary) !important;
+        border-color: var(--border-color) !important;
+        background: transparent !important;
+    }
+
+        .btn-outline-secondary:hover {
+            background: var(--bg-secondary) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+
+    .bus-shell-portrait {
+        position: relative;
+        display: inline-block;
+        padding: 14px;
+        background: var(--bg-bus-shell);
+        border: 4px solid var(--bus-shell-border);
+        border-radius: 26px;
+        overflow: visible;
+        box-shadow: 0 12px 26px var(--shadow-color);
+        max-width: 100%;
+    }
+
+        .bus-shell-portrait::before {
+            content: "";
+            position: absolute;
+            left: -2px;
+            right: -2px;
+            top: -22px;
+            height: 46px;
+            background: linear-gradient(180deg, var(--bus-shell-gradient-start), var(--bus-shell-gradient-end));
+            border: 4px solid var(--bus-shell-border);
+            border-bottom: none;
+            border-radius: 60px 60px 18px 18px;
+            box-shadow: 0 10px 18px var(--shadow-color);
+            pointer-events: none;
+        }
+
+    .bus-interior {
+        padding: 10px;
+        border-radius: 18px;
+        border: 2px dashed var(--border-dashed);
+        background: var(--bg-bus-interior);
+    }
+
+    .grid-wrap {
+        position: relative;
+        display: inline-block;
+        overflow: visible;
+    }
+
+    .grid {
+        position: relative;
+        border-radius: 14px;
+        border: 2px solid var(--border-soft);
+        background: var(--bg-bus-interior);
+        overflow: hidden;
+    }
+
+    .door-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 50;
+        overflow: visible;
+    }
+
+    .door {
+        position: absolute;
+        border-radius: 6px;
+        background: var(--door-bg);
+        border: 2px solid var(--door-border);
+        box-shadow: 0 4px 10px var(--door-shadow);
+        display: flex;
+        gap: 2px;
+        padding: 2px;
+        opacity: 0.92;
+    }
+
+    .door-panel {
+        flex: 1;
+        background: var(--door-panel-bg);
+        border: 1px solid var(--door-panel-border);
+        border-radius: 3px;
+    }
+
+    .cell-seat {
+        position: absolute;
+        border: 2px solid;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 13px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.10);
+        box-shadow: 0 3px 8px var(--shadow-color);
+        user-select: none;
+        cursor: pointer;
+        transition: transform .08s ease, box-shadow .08s ease, outline .08s ease, filter .08s ease;
+        background: var(--bg-card);
+    }
+
+        .cell-seat:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px var(--shadow-hover);
+            filter: brightness(1.03);
+        }
+
+        .cell-seat.available {
+            background: var(--seat-available-bg);
+            border-color: var(--seat-available-border);
+            color: var(--seat-available-text);
+        }
+
+        .cell-seat.selected {
+            background: var(--seat-selected-bg);
+            border-color: var(--seat-selected-border);
+            color: var(--seat-selected-text);
+            outline: 3px solid var(--seat-selected-outline);
+            outline-offset: 1px;
+        }
+
+        .cell-seat.booked {
+            background: var(--seat-booked-bg);
+            border-color: var(--seat-booked-border);
+            color: var(--seat-booked-text);
+            cursor: not-allowed;
+            opacity: 1;
+        }
+
+        .cell-seat.driver {
+            background: var(--seat-driver-bg);
+            border-color: var(--seat-driver-border);
+            color: var(--seat-driver-text);
+            cursor: not-allowed;
+        }
+
+        .cell-seat.assistant {
+            background: var(--seat-assistant-bg);
+            border-color: var(--seat-assistant-border);
+            color: var(--seat-assistant-text);
+            cursor: not-allowed;
+        }
+
+        .cell-seat.disabled:not(.booked):not(.driver):not(.assistant) {
+            cursor: not-allowed;
+            opacity: 0.75;
+            background: var(--seat-disabled-bg);
+            border-color: var(--seat-disabled-border);
+            color: var(--seat-disabled-text);
+        }
+
+    .cell-wc {
+        position: absolute;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 18px;
+        background: var(--wc-bg);
+        border: 2px solid var(--wc-border);
+        color: var(--wc-text);
+        box-shadow: 0 3px 10px var(--shadow-color);
+        user-select: none;
+    }
+
+    .cell-aisle {
+        position: absolute;
+        background: transparent;
+        pointer-events: none;
+    }
+
+    /* ✅✅✅ التعديل المطلوب فقط هنا: نخلي الـ legend سطر واحد تحت كل الباصات */
+    .legend {
+        display: flex;
+        gap: 16px;
+        flex-wrap: nowrap; /* ✅ سطر واحد */
+        white-space: nowrap; /* ✅ يمنع كسر السطر */
+        overflow-x: auto; /* ✅ لو العرض ضاق يطلع سكرول أفقي بسيط */
+        justify-content: center;
+        align-items: center;
+        margin-top: 15px;
+        margin-bottom: 5px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        background: var(--bg-legend);
+        padding: 10px 15px;
+        border-radius: 30px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 .35rem .9rem rgba(0,0,0,0.05);
+    }
+
+        .legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+    .dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        border: 1px solid var(--border-soft);
+        box-shadow: inset 0 1px 2px var(--shadow-color);
+        flex: 0 0 auto;
+    }
+
+    .trip-summary .k {
+        color: var(--trip-summary-k);
+        font-size: .8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .trip-summary .v {
+        font-weight: 700;
+        color: var(--trip-summary-v);
+    }
+
+    .min-req-box {
+        border: 1px dashed var(--border-color);
+        border-radius: 14px;
+        padding: 10px 12px;
+        background: var(--bg-secondary);
+        font-size: .9rem;
+        color: var(--text-primary);
+    }
+
+        .min-req-box .smallmuted {
+            color: var(--text-muted);
+            font-size: .82rem;
+        }
+
+    .btn[disabled] {
+        opacity: .65;
+        cursor: not-allowed;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="mb-0" style="color: var(--text-primary);">Trip Booking</h3>
+            <div class="text-muted small">Mode: <span class="fw-semibold">@ModeLabel</span></div>
+        </div>
+        <a class="btn btn-outline-secondary" href="@Url.Action("Index", "Booking")">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+
+    <!-- ✅ Trip details -->
+    <div class="card shadow-sm mb-3 trip-summary" style="border-radius:18px;">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-lg-6">
+                    <div class="k">Trip</div>
+                    <div class="v">@Model.TripName</div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="k">Depart</div>
+                    <div class="v">@((Model.DepartDate ?? "-")) @((Model.DepartTime ?? "-"))</div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="k">Route</div>
+                    <div class="v">@Model.FromCity → @Model.ToCity</div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="k">Pickup place</div>
+                    <div class="v">@((string.IsNullOrWhiteSpace(Model.PickupPlace) ? "-" : Model.PickupPlace))</div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="k">Dropoff place</div>
+                    <div class="v">@((string.IsNullOrWhiteSpace(Model.DropoffPlace) ? "-" : Model.DropoffPlace))</div>
+                </div>
+
+                @if (Model.BookingMode == TripPriceType.Round)
+                {
+                    <div class="col-12"><hr class="my-2" /></div>
+                    <div class="col-lg-6">
+                        <div class="k">Return trip</div>
+                        <div class="v">@Model.ReturnTripName</div>
+                    </div>
+                    <div class="col-lg-3 col-6">
+                        <div class="k">Return depart</div>
+                        <div class="v">@((Model.ReturnDepartDate ?? "-")) @((Model.ReturnDepartTime ?? "-"))</div>
+                    </div>
+                    <div class="col-lg-3 col-6">
+                        <div class="k">Return route</div>
+                        @if (Model.FromCity == Model.ReturnFromCity)
+                        {
+                            <div class="v">@Model.ReturnToCity → @Model.ReturnFromCity</div>
+                        }
+                        else
+                        {
+                            <div class="v">@Model.ReturnFromCity → @Model.ReturnToCity</div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+@*     <form method="post" asp-action="Create" asp-controller="Booking">
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" name="Input.TripId" value="@Model.TripId" />
+        <input type="hidden" name="Input.BookingType" id="BookingType"
+               value="@(Model.BookingMode == TripPriceType.Go ? 1 : Model.BookingMode == TripPriceType.Return ? 2 : 3)" />
+        <input type="hidden" name="Input.ReturnTripId" value="@(Model.ReturnTripId?.ToString() ?? "")" />
+
+        <input type="hidden" id="SeatsMainCsv" name="Input.SeatsMainCsv" value="@Model.Input.SeatsMainCsv" />
+        <input type="hidden" id="SeatsReturnCsv" name="Input.SeatsReturnCsv" value="@Model.Input.SeatsReturnCsv" />
+
+        <!-- ✅ (UI فقط) معلومات المطلوب - السيرفر لازم يتحقق في Create -->
+         <input type="hidden" id="ReqMain" value="@requiredMain" />
+        <input type="hidden" id="ReqReturn" value="@requiredReturn" />
+        <input type="hidden" id="IsRound" value="@(isRound ? "1" : "0")" />
+
+        <div class="row g-3">
+            <!-- CUSTOMER -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100" style="border-radius:18px;">
+                    <div class="card-body">
+                        <div class="fw-semibold mb-2">Customer</div>
+
+                        <!-- ✅ AutoComplete (Name/Phone) -->
+                        <div class="mb-2">
+                            <label class="form-label">Name</label>
+                            <input id="CustName" class="form-control"
+                                   name="Input.CustomerName"
+                                   value="@Model.Input.CustomerName"
+                                   required autocomplete="off"
+                                   list="custNamesList" />
+                            <datalist id="custNamesList"></datalist>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Phone</label>
+                            <input id="CustPhone" class="form-control"
+                                   name="Input.Phone"
+                                   value="@Model.Input.Phone"
+                                   required autocomplete="off"
+                                   list="custPhonesList" />
+                            <datalist id="custPhonesList"></datalist>
+                        </div>
+
+                        <!-- ✅ Destination Place (REQUIRED) -->
+                        <div class="mb-2">
+                            <label class="form-label">Destination</label>
+                            <input class="form-control"
+                                   name="Input.DestinationPlaceName"
+                                   value="@Model.Input.DestinationPlaceName"
+                                   required
+                                   autocomplete="off"
+                                   list="destMainList"
+                                   placeholder="" />
+                            <datalist id="destMainList">
+                                @foreach (var s in (Model.MainDestinationSuggestions ?? new List<string>()))
+                                {
+                                    <option value="@s"></option>
+                                }
+                            </datalist>
+                        </div>
+
+                        @if (Model.BookingMode == TripPriceType.Round)
+                        {
+                            <div class="mb-2">
+                                <label class="form-label">Return Destination</label>
+                                <input class="form-control"
+                                       name="Input.ReturnDestinationPlaceName"
+                                       value="@Model.Input.ReturnDestinationPlaceName"
+                                       required
+                                       autocomplete="off"
+                                       list="destReturnList"
+                                       placeholder="" />
+                                <datalist id="destReturnList">
+                                    @foreach (var s in (Model.ReturnDestinationSuggestions ?? new List<string>()))
+                                    {
+                                        <option value="@s"></option>
+                                    }
+                                </datalist>
+                            </div>
+                        }
+
+                        <div class="mb-2">
+                            <label class="form-label">Notes</label>
+                            <input id="Notes" class="form-control"
+                                   name="Input.Description"
+                                   value="@Model.Input.Description" />
+                        </div>
+
+                        <div class="min-req-box mb-2">
+                            <div class="fw-semibold">Minimum seats rule</div>
+                            <div class="smallmuted">
+                                MAIN: @RequiredTextMain
+                                @if (isRound)
+                                {
+                                    <span><br />RETURN: @RequiredTextReturn</span>
+                                }
+                            </div>
+                            <div class="mt-2">
+                                Selected MAIN: <b id="MainCountText">0</b>
+                                @if (isRound)
+                                {
+                                    <span> | Selected RETURN: <b id="ReturnCountText">0</b></span>
+                                }
+                            </div>
+                            <div class="mt-1 text-danger" id="MinWarn" style="display:none;"></div>
+                        </div>
+
+                        <div class="alert alert-light mb-0">
+                            <div class="fw-semibold">Pricing</div>
+
+                            @if (Model.BookingMode == TripPriceType.Go)
+                            {
+                                <div class="text-muted small">Go seat: <span class="fw-semibold">@Money(Model.SeatPriceGo)</span></div>
+                            }
+                            else if (Model.BookingMode == TripPriceType.Return)
+                            {
+                                <div class="text-muted small">Return seat: <span class="fw-semibold">@Money(Model.SeatPriceReturn)</span></div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small">Go seat: <span class="fw-semibold">@Money(Model.SeatPriceGo)</span></div>
+                                <div class="text-muted small">Return seat: <span class="fw-semibold">@Money(Model.SeatPriceReturn)</span></div>
+                            }
+
+                            <div class="mt-2">Total: <span class="fw-bold" id="TotalText">0</span></div>
+                        </div>
+
+                        <button id="ConfirmBtn" class="btn btn-primary w-100 mt-3" type="submit">
+                            <i class="bi bi-check2-circle me-1"></i> Confirm Booking
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BUSES -->
+            <div class="col-lg-8">
+                <div class="row g-3">
+
+                    <!-- MAIN BUS -->
+                    <div class="@(Model.BookingMode == TripPriceType.Round ? "col-lg-6" : "col-12")">
+                        <div class="card shadow-sm" style="border-radius:18px;">
+                            <div class="card-header bg-white fw-semibold">
+                                @(Model.BookingMode == TripPriceType.Return ? "RETURN Trip Bus" : "GO Trip Bus")
+                                <span class="text-muted small ms-2">@Model.BusName</span>
+                            </div>
+
+                            <div class="card-body">
+                                <div class="d-flex justify-content-center">
+                                    <div class="bus-shell-portrait">
+                                        <div class="bus-interior">
+                                            <div class="grid-wrap">
+
+                                                <!-- Door overlay layer (MAIN) -->
+                                                <div class="door-layer">
+                                                    @foreach (var c in (Model.GridMain ?? new()).Where(x => x.HasDoor))
+                                                    {
+                                                        <div class="door" style="@DoorOverlayStyle(c.X, c.Y, Model.LayoutW, c.DoorSide, c.DoorOffset)" title="Door">
+                                                            <div class="door-panel"></div>
+                                                            <div class="door-panel"></div>
+                                                        </div>
+                                                    }
+                                                </div>
+
+                                                <!-- Grid (MAIN) -->
+                                                <div class="grid"
+                                                     style="width:@(Model.LayoutW* CELL)px; height:@(Model.LayoutH* CELL)px;
+                                                            background-size:@(CELL)px @(CELL)px;
+                                                            background-image:
+                                                               linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                                                               linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);">
+
+                                                    @foreach (var c in (Model.GridMain ?? new()))
+                                                    {
+                                                        var left = c.X * CELL + PAD;
+                                                        var top = c.Y * CELL + PAD;
+                                                        var w = CELL - PAD * 2;
+                                                        var h = CELL - PAD * 2;
+
+                                                        if (IsWC(c))
+                                                        {
+                                                            <div class="cell-wc"
+                                                                 style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                 title="WC">
+                                                                🚻
+                                                            </div>
+                                                        }
+                                                        else if (IsAisle(c))
+                                                        {
+                                                            <div class="cell-aisle"
+                                                                 style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                 title="Aisle"></div>
+                                                        }
+                                                        else if (!IsSeat(c) && !IsWC(c))
+                                                        {
+                                                            <div class="cell-aisle"
+                                                                 style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                 title=""></div>
+                                                        }
+                                                        else
+                                                        {
+                                                            var code = (c.SeatCode ?? "").Trim();
+                                                            var role = (c.Role ?? "Passenger").Trim();
+                                                            var booked = (Model.UnavailableMain?.Contains(code) ?? false);
+
+                                                            var cls = "cell-seat";
+
+                                                            if (!c.IsActive) cls += " disabled";
+                                                            else if (role.Equals("Driver", StringComparison.OrdinalIgnoreCase)) cls += " driver disabled";
+                                                            else if (role.Equals("Assistant", StringComparison.OrdinalIgnoreCase)) cls += " assistant disabled";
+                                                            else if (booked) cls += " booked disabled";
+                                                            else if (!c.IsSelectable) cls += " disabled";
+                                                            else cls += " available";
+
+                                                            <div class="@cls"
+                                                                 data-leg="main"
+                                                                 data-seat="@code"
+                                                                 style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                 title="@($"{code} • {role}")">
+                                                                @code
+                                                            </div>
+                                                        }
+                                                    }
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ✅✅✅ (تم نقل الـ legend من هنا) -->
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RETURN BUS -->
+                    @if (Model.BookingMode == TripPriceType.Round)
+                    {
+                        <div class="col-lg-6">
+                            <div class="card shadow-sm" style="border-radius:18px;">
+                                <div class="card-header bg-white fw-semibold">
+                                    RETURN Trip Bus
+                                    <span class="text-muted small ms-2">@Model.ReturnBusName</span>
+                                </div>
+
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-center">
+                                        <div class="bus-shell-portrait">
+                                            <div class="bus-interior">
+                                                <div class="grid-wrap">
+
+                                                    <div class="door-layer">
+                                                        @foreach (var c in (Model.GridReturn ?? new()).Where(x => x.HasDoor))
+                                                        {
+                                                            <div class="door" style="@DoorOverlayStyle(c.X, c.Y, Model.ReturnLayoutW, c.DoorSide, c.DoorOffset)" title="Door">
+                                                                <div class="door-panel"></div>
+                                                                <div class="door-panel"></div>
+                                                            </div>
+                                                        }
+                                                    </div>
+
+                                                    <div class="grid"
+                                                         style="width:@(Model.ReturnLayoutW* CELL)px; height:@(Model.ReturnLayoutH* CELL)px;
+                                                                        background-size:@(CELL)px @(CELL)px;
+                                                                        background-image:
+                                                                           linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                                                                           linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);">
+
+                                                        @foreach (var c in (Model.GridReturn ?? new()))
+                                                        {
+                                                            var left = c.X * CELL + PAD;
+                                                            var top = c.Y * CELL + PAD;
+                                                            var w = CELL - PAD * 2;
+                                                            var h = CELL - PAD * 2;
+
+                                                            if (IsWC(c))
+                                                            {
+                                                                <div class="cell-wc"
+                                                                     style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                     title="WC">
+                                                                    🚻
+                                                                </div>
+                                                            }
+                                                            else if (IsAisle(c))
+                                                            {
+                                                                <div class="cell-aisle"
+                                                                     style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                     title="Aisle"></div>
+                                                            }
+                                                            else if (!IsSeat(c) && !IsWC(c))
+                                                            {
+                                                                <div class="cell-aisle"
+                                                                     style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                     title=""></div>
+                                                            }
+                                                            else
+                                                            {
+                                                                var code = (c.SeatCode ?? "").Trim();
+                                                                var role = (c.Role ?? "Passenger").Trim();
+                                                                var booked = (Model.UnavailableReturn?.Contains(code) ?? false);
+
+                                                                var cls = "cell-seat";
+
+                                                                if (!c.IsActive) cls += " disabled";
+                                                                else if (role.Equals("Driver", StringComparison.OrdinalIgnoreCase)) cls += " driver disabled";
+                                                                else if (role.Equals("Assistant", StringComparison.OrdinalIgnoreCase)) cls += " assistant disabled";
+                                                                else if (booked) cls += " booked disabled";
+                                                                else if (!c.IsSelectable) cls += " disabled";
+                                                                else cls += " available";
+
+                                                                <div class="@cls"
+                                                                     data-leg="return"
+                                                                     data-seat="@code"
+                                                                     style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                     title="@($"{code} • {role}")">
+                                                                    @code
+                                                                </div>
+                                                            }
+                                                        }
+                                                    </div>
+
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- ✅✅✅ (لا يوجد legend هنا أيضًا) -->
+
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                </div>
+
+                <!-- ✅✅✅ التعديل المطلوب: Legend واحدة تحت كل الباصات المعروضة -->
+                <div class="legend">
+                    <span><span class="dot" style="background: var(--seat-available-bg); border-color: var(--seat-available-border);"></span> Available</span>
+                    <span><span class="dot" style="background: var(--seat-selected-bg); border-color: var(--seat-selected-border);"></span> Selected</span>
+                    <span><span class="dot" style="background: var(--seat-booked-bg); border-color: var(--seat-booked-border);"></span> Booked</span>
+                    <span><span class="dot" style="background: var(--seat-driver-bg); border-color: var(--seat-driver-border);"></span> Driver</span>
+                    <span><span class="dot" style="background: var(--seat-assistant-bg); border-color: var(--seat-assistant-border);"></span> Assistant</span>
+                    <span><span class="dot" style="background: linear-gradient(145deg, #f59e0b, #fbbf24); border-color: var(--door-border);"></span> Door</span>
+                </div>
+            </div>
+
+        </div>
+    </form> *@
+    <form method="post" asp-action="Create" asp-controller="Booking">
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" name="TripId" value="@Model.TripId" />
+        <input type="hidden" name="BookingType" id="BookingType"
+               value="@(Model.BookingMode == TripPriceType.Go ? 1 : Model.BookingMode == TripPriceType.Return ? 2 : 3)" />
+        <input type="hidden" name="ReturnTripId" value="@(Model.ReturnTripId?.ToString() ?? "")" />
+
+        <input type="hidden" id="SeatsMainCsv" name="SeatsMainCsv" value="@Model.Input.SeatsMainCsv" />
+        <input type="hidden" id="SeatsReturnCsv" name="SeatsReturnCsv" value="@Model.Input.SeatsReturnCsv" />
+
+        <input type="hidden" id="ReqMain" name="RequiredMainSeats" value="@requiredMain" />
+        <input type="hidden" id="ReqReturn" name="RequiredReturnSeats" value="@requiredReturn" />
+        <input type="hidden" id="IsRound" value="@(isRound ? "1" : "0")" />
+
+        <div class="row g-3">
+            <!-- CUSTOMER -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100" style="border-radius:18px;">
+                    <div class="card-body">
+                        <div class="fw-semibold mb-2">Customer</div>
+
+                        <!-- AutoComplete (Name/Phone) -->
+                        <div class="mb-2">
+                            <label class="form-label">Name</label>
+                            <input id="CustName" class="form-control"
+                                   name="CustomerName"
+                                   value="@Model.Input.CustomerName"
+                                   required autocomplete="off"
+                                   list="custNamesList" />
+                            <datalist id="custNamesList"></datalist>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Phone</label>
+                            <input id="CustPhone" class="form-control"
+                                   name="Phone"
+                                   value="@Model.Input.Phone"
+                                   required autocomplete="off"
+                                   list="custPhonesList" />
+                            <datalist id="custPhonesList"></datalist>
+                        </div>
+
+                        <!-- Destination Place (REQUIRED) -->
+                        <div class="mb-2">
+                            <label class="form-label">Destination</label>
+                            <input class="form-control"
+                                   name="DestinationPlaceName"
+                                   value="@Model.Input.DestinationPlaceName"
+                                   required
+                                   autocomplete="off"
+                                   list="destMainList"
+                                   placeholder="" />
+                            <datalist id="destMainList">
+                                @foreach (var s in (Model.MainDestinationSuggestions ?? new List<string>()))
+                                {
+                                    <option value="@s"></option>
+                                }
+                            </datalist>
+                        </div>
+
+                        @if (Model.BookingMode == TripPriceType.Round)
+                        {
+                            <div class="mb-2">
+                                <label class="form-label">Return Destination</label>
+                                <input class="form-control"
+                                       name="ReturnDestinationPlaceName"
+                                       value="@Model.Input.ReturnDestinationPlaceName"
+                                       required
+                                       autocomplete="off"
+                                       list="destReturnList"
+                                       placeholder="" />
+                                <datalist id="destReturnList">
+                                    @foreach (var s in (Model.ReturnDestinationSuggestions ?? new List<string>()))
+                                    {
+                                        <option value="@s"></option>
+                                    }
+                                </datalist>
+                            </div>
+                        }
+
+                        <div class="mb-2">
+                            <label class="form-label">Notes</label>
+                            <input id="Notes" class="form-control"
+                                   name="Description"
+                                   value="@Model.Input.Description" />
+                        </div>
+
+                        <div class="min-req-box mb-2">
+                            <div class="fw-semibold">Minimum seats rule</div>
+                            <div class="smallmuted">
+                                MAIN: @RequiredTextMain
+                                @if (isRound)
+                                {
+                                    <span><br />RETURN: @RequiredTextReturn</span>
+                                }
+                            </div>
+                            <div class="mt-2">
+                                Selected MAIN: <b id="MainCountText">0</b>
+                                @if (isRound)
+                                {
+                                    <span> | Selected RETURN: <b id="ReturnCountText">0</b></span>
+                                }
+                            </div>
+                            <div class="mt-1 text-danger" id="MinWarn" style="display:none;"></div>
+                        </div>
+
+                        <div class="alert alert-light mb-0">
+                            <div class="fw-semibold">Pricing</div>
+
+                            @if (Model.BookingMode == TripPriceType.Go)
+                            {
+                                <div class="text-muted small">Go seat: <span class="fw-semibold">@Money(Model.SeatPriceGo)</span></div>
+                            }
+                            else if (Model.BookingMode == TripPriceType.Return)
+                            {
+                                <div class="text-muted small">Return seat: <span class="fw-semibold">@Money(Model.SeatPriceReturn)</span></div>
+                            }
+                            else
+                            {
+                                <div class="text-muted small">Go seat: <span class="fw-semibold">@Money(Model.SeatPriceGo)</span></div>
+                                <div class="text-muted small">Return seat: <span class="fw-semibold">@Money(Model.SeatPriceReturn)</span></div>
+                            }
+
+                            <div class="mt-2">Total: <span class="fw-bold" id="TotalText">0</span></div>
+                        </div>
+
+                        <button id="ConfirmBtn" class="btn btn-primary w-100 mt-3" type="submit">
+                            <i class="bi bi-check2-circle me-1"></i> Confirm Booking
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BUSES -->
+            <div class="col-lg-8">
+                <div class="row g-3">
+
+                    <!-- MAIN BUS -->
+                    <div class="@(Model.BookingMode == TripPriceType.Round ? "col-lg-6" : "col-12")">
+                        <div class="card shadow-sm" style="border-radius:18px;">
+                            <div class="card-header bg-white fw-semibold">
+                                @(Model.BookingMode == TripPriceType.Return ? "RETURN Trip Bus" : "GO Trip Bus")
+                                <span class="text-muted small ms-2">@Model.BusName</span>
+                            </div>
+
+                            <div class="card-body">
+                                <div class="d-flex justify-content-center">
+                                    <div class="bus-shell-portrait">
+                                        <div class="bus-interior">
+                                            <div class="grid-wrap">
+
+                                                <!-- Door overlay layer (MAIN) -->
+                                                <div class="door-layer">
+                                                    @foreach (var c in (Model.GridMain ?? new()).Where(x => x.HasDoor))
+                                                    {
+                                                        <div class="door" style="@DoorOverlayStyle(c.X, c.Y, Model.LayoutW, c.DoorSide, c.DoorOffset)" title="Door">
+                                                            <div class="door-panel"></div>
+                                                            <div class="door-panel"></div>
+                                                        </div>
+                                                    }
+                                                </div>
+
+                                                <!-- Grid (MAIN) -->
+                                                <div class="grid"
+                                                     style="width:@(Model.LayoutW* CELL)px; height:@(Model.LayoutH* CELL)px;
+                                                    background-size:@(CELL)px @(CELL)px;
+                                                    background-image:
+                                                    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                                                    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);">
+
+                                                    @foreach (var c in (Model.GridMain ?? new()))
+                                                    {
+                                                        var left = c.X * CELL + PAD;
+                                                        var top = c.Y * CELL + PAD;
+                                                        var w = CELL - PAD * 2;
+                                                        var h = CELL - PAD * 2;
+
+                                                        if (IsWC(c))
+                                                        {
+                                                            <div class="cell-wc"
+                                                                 style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                 title="WC">
+                                                                🚻
+                                                            </div>
+                                                        }
+                                                        else if (IsAisle(c))
+                                                        {
+                                                            <div class="cell-aisle"
+                                                                 style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                 title="Aisle"></div>
+                                                        }
+                                                        else if (!IsSeat(c) && !IsWC(c))
+                                                        {
+                                                            <div class="cell-aisle"
+                                                                 style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                 title=""></div>
+                                                        }
+                                                        else
+                                                        {
+                                                            var code = (c.SeatCode ?? "").Trim();
+                                                            var role = (c.Role ?? "Passenger").Trim();
+                                                            var booked = (Model.UnavailableMain?.Contains(code) ?? false);
+
+                                                            var cls = "cell-seat";
+
+                                                            if (!c.IsActive) cls += " disabled";
+                                                            else if (role.Equals("Driver", StringComparison.OrdinalIgnoreCase)) cls += " driver disabled";
+                                                            else if (role.Equals("Assistant", StringComparison.OrdinalIgnoreCase)) cls += " assistant disabled";
+                                                            else if (booked) cls += " booked disabled";
+                                                            else if (!c.IsSelectable) cls += " disabled";
+                                                            else cls += " available";
+
+                                                            <div class="@cls"
+                                                                 data-leg="main"
+                                                                 data-seat="@code"
+                                                                 style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                 title="@($"{code} • {role}")">
+                                                                @code
+                                                            </div>
+                                                        }
+                                                    }
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RETURN BUS -->
+                    @if (Model.BookingMode == TripPriceType.Round)
+                    {
+                        <div class="col-lg-6">
+                            <div class="card shadow-sm" style="border-radius:18px;">
+                                <div class="card-header bg-white fw-semibold">
+                                    RETURN Trip Bus
+                                    <span class="text-muted small ms-2">@Model.ReturnBusName</span>
+                                </div>
+
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-center">
+                                        <div class="bus-shell-portrait">
+                                            <div class="bus-interior">
+                                                <div class="grid-wrap">
+
+                                                    <div class="door-layer">
+                                                        @foreach (var c in (Model.GridReturn ?? new()).Where(x => x.HasDoor))
+                                                        {
+                                                            <div class="door" style="@DoorOverlayStyle(c.X, c.Y, Model.ReturnLayoutW, c.DoorSide, c.DoorOffset)" title="Door">
+                                                                <div class="door-panel"></div>
+                                                                <div class="door-panel"></div>
+                                                            </div>
+                                                        }
+                                                    </div>
+
+                                                    <div class="grid"
+                                                         style="width:@(Model.ReturnLayoutW* CELL)px; height:@(Model.ReturnLayoutH* CELL)px;
+                                                        background-size:@(CELL)px @(CELL)px;
+                                                        background-image:
+                                                        linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                                                        linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);">
+
+                                                        @foreach (var c in (Model.GridReturn ?? new()))
+                                                        {
+                                                            var left = c.X * CELL + PAD;
+                                                            var top = c.Y * CELL + PAD;
+                                                            var w = CELL - PAD * 2;
+                                                            var h = CELL - PAD * 2;
+
+                                                            if (IsWC(c))
+                                                            {
+                                                                <div class="cell-wc"
+                                                                     style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                     title="WC">
+                                                                    🚻
+                                                                </div>
+                                                            }
+                                                            else if (IsAisle(c))
+                                                            {
+                                                                <div class="cell-aisle"
+                                                                     style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                     title="Aisle"></div>
+                                                            }
+                                                            else if (!IsSeat(c) && !IsWC(c))
+                                                            {
+                                                                <div class="cell-aisle"
+                                                                     style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                     title=""></div>
+                                                            }
+                                                            else
+                                                            {
+                                                                var code = (c.SeatCode ?? "").Trim();
+                                                                var role = (c.Role ?? "Passenger").Trim();
+                                                                var booked = (Model.UnavailableReturn?.Contains(code) ?? false);
+
+                                                                var cls = "cell-seat";
+
+                                                                if (!c.IsActive) cls += " disabled";
+                                                                else if (role.Equals("Driver", StringComparison.OrdinalIgnoreCase)) cls += " driver disabled";
+                                                                else if (role.Equals("Assistant", StringComparison.OrdinalIgnoreCase)) cls += " assistant disabled";
+                                                                else if (booked) cls += " booked disabled";
+                                                                else if (!c.IsSelectable) cls += " disabled";
+                                                                else cls += " available";
+
+                                                                <div class="@cls"
+                                                                     data-leg="return"
+                                                                     data-seat="@code"
+                                                                     style="left:@(left)px; top:@(top)px; width:@(w)px; height:@(h)px;"
+                                                                     title="@($"{code} • {role}")">
+                                                                    @code
+                                                                </div>
+                                                            }
+                                                        }
+                                                    </div>
+
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                </div>
+
+                <!-- Legend -->
+                <div class="legend">
+                    <span><span class="dot" style="background: var(--seat-available-bg); border-color: var(--seat-available-border);"></span> Available</span>
+                    <span><span class="dot" style="background: var(--seat-selected-bg); border-color: var(--seat-selected-border);"></span> Selected</span>
+                    <span><span class="dot" style="background: var(--seat-booked-bg); border-color: var(--seat-booked-border);"></span> Booked</span>
+                    <span><span class="dot" style="background: var(--seat-driver-bg); border-color: var(--seat-driver-border);"></span> Driver</span>
+                    <span><span class="dot" style="background: var(--seat-assistant-bg); border-color: var(--seat-assistant-border);"></span> Assistant</span>
+                    <span><span class="dot" style="background: linear-gradient(145deg, #f59e0b, #fbbf24); border-color: var(--door-border);"></span> Door</span>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script nonce="@nonce">
+    (function () {
+      const bookingType = parseInt(document.getElementById('BookingType')?.value || "1", 10);
+
+      const seatsMainHidden = document.getElementById('SeatsMainCsv');
+      const seatsReturnHidden = document.getElementById('SeatsReturnCsv');
+      const totalText = document.getElementById('TotalText');
+
+      const priceGo = parseFloat('@Model.SeatPriceGo'.replace(',', '.')) || 0;
+      const priceReturn = parseFloat('@Model.SeatPriceReturn'.replace(',', '.')) || 0;
+
+      const reqMain = parseInt(document.getElementById('ReqMain')?.value || "1", 10);
+      const reqReturn = parseInt(document.getElementById('ReqReturn')?.value || "1", 10);
+      const isRound = (document.getElementById('IsRound')?.value || "0") === "1";
+
+      const mainCountText = document.getElementById('MainCountText');
+      const returnCountText = document.getElementById('ReturnCountText');
+      const minWarn = document.getElementById('MinWarn');
+      const confirmBtn = document.getElementById('ConfirmBtn');
+
+      const selectedMain = new Set();
+      const selectedReturn = new Set();
+
+      function parseCsv(v){ return (v || '').split(',').map(x => x.trim()).filter(Boolean); }
+
+      parseCsv(seatsMainHidden?.value).forEach(s => selectedMain.add(s));
+      parseCsv(seatsReturnHidden?.value).forEach(s => selectedReturn.add(s));
+
+      function syncHidden() {
+        if (seatsMainHidden) seatsMainHidden.value = Array.from(selectedMain).join(',');
+        if (seatsReturnHidden) seatsReturnHidden.value = Array.from(selectedReturn).join(',');
+      }
+
+      function calcTotal() {
+        const mainCount = selectedMain.size;
+        const retCount = selectedReturn.size;
+
+        let total = 0;
+        if (bookingType === 1) total = mainCount * priceGo;
+        else if (bookingType === 2) total = mainCount * priceReturn;
+        else total = (mainCount * priceGo) + (retCount * priceReturn);
+
+        if (totalText) totalText.textContent = (Math.round(total * 100) / 100).toString();
+      }
+
+      function refreshSelectedUI() {
+        document.querySelectorAll('.cell-seat[data-leg="main"]').forEach(el => {
+          const s = el.getAttribute('data-seat') || '';
+          if (!s) return;
+          el.classList.toggle('selected', selectedMain.has(s));
+        });
+        document.querySelectorAll('.cell-seat[data-leg="return"]').forEach(el => {
+          const s = el.getAttribute('data-seat') || '';
+          if (!s) return;
+          el.classList.toggle('selected', selectedReturn.has(s));
+        });
+      }
+
+      function refreshMinRuleUI() {
+        const m = selectedMain.size;
+        const r = selectedReturn.size;
+
+        if (mainCountText) mainCountText.textContent = String(m);
+        if (returnCountText) returnCountText.textContent = String(r);
+
+        let ok = true;
+        let msg = "";
+
+        if (m < reqMain) {
+          ok = false;
+          msg = "You must select at least " + reqMain + " seat(s) in MAIN.";
+        }
+
+        if (ok && isRound) {
+          if (r < reqReturn) {
+            ok = false;
+            msg = "You must select at least " + reqReturn + " seat(s) in RETURN.";
+          }
+        }
+
+        if (minWarn) {
+          minWarn.style.display = ok ? "none" : "";
+          minWarn.textContent = msg;
+        }
+        if (confirmBtn) confirmBtn.disabled = !ok;
+      }
+
+      document.addEventListener('click', function (e) {
+        const el = e.target.closest('.cell-seat');
+        if (!el) return;
+
+        if (el.classList.contains('disabled') || el.classList.contains('booked') || el.classList.contains('driver') || el.classList.contains('assistant'))
+          return;
+
+        const seat = el.getAttribute('data-seat') || '';
+        if (!seat) return;
+
+        const leg = el.getAttribute('data-leg') || 'main';
+        if (bookingType !== 3 && leg !== 'main') return;
+
+        if (leg === 'main') {
+          if (selectedMain.has(seat)) selectedMain.delete(seat);
+          else selectedMain.add(seat);
+        } else {
+          if (selectedReturn.has(seat)) selectedReturn.delete(seat);
+          else selectedReturn.add(seat);
+        }
+
+        syncHidden();
+        refreshSelectedUI();
+        calcTotal();
+        refreshMinRuleUI();
+      });
+
+      // --------- AutoComplete for customers ----------
+      const nameEl = document.getElementById('CustName');
+      const phoneEl = document.getElementById('CustPhone');
+      const namesList = document.getElementById('custNamesList');
+      const phonesList = document.getElementById('custPhonesList');
+
+      let lastRows = [];
+
+      function setDatalistOptions(listEl, arr) {
+        if (!listEl) return;
+        listEl.innerHTML = "";
+        (arr || []).forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = v;
+          listEl.appendChild(opt);
+        });
+      }
+
+      let tmr = null;
+      async function fetchSuggestions(q) {
+        const url = '@Url.Action("CustomerSuggest", "Booking")' + '?q=' + encodeURIComponent(q || '');
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+
+      function scheduleSuggest(sourceEl) {
+        if (!sourceEl) return;
+        const q = (sourceEl.value || "").trim();
+        if (q.length < 2) {
+          lastRows = [];
+          setDatalistOptions(namesList, []);
+          setDatalistOptions(phonesList, []);
+          return;
+        }
+        clearTimeout(tmr);
+        tmr = setTimeout(async () => {
+          const rows = await fetchSuggestions(q);
+          lastRows = rows;
+
+          const names = rows.map(x => x.name).filter(Boolean);
+          const phones = rows.map(x => x.phone).filter(Boolean);
+
+          setDatalistOptions(namesList, Array.from(new Set(names)));
+          setDatalistOptions(phonesList, Array.from(new Set(phones)));
+        }, 180);
+      }
+
+      function tryAutofillByName() {
+        const name = (nameEl?.value || "").trim();
+        if (!name) return;
+        const row = lastRows.find(x => (x.name || "").toLowerCase() === name.toLowerCase());
+        if (row && phoneEl && !phoneEl.value) phoneEl.value = row.phone || "";
+      }
+
+      function tryAutofillByPhone() {
+        const phone = (phoneEl?.value || "").trim();
+        if (!phone) return;
+        const row = lastRows.find(x => (x.phone || "") === phone);
+        if (row && nameEl && !nameEl.value) nameEl.value = row.name || "";
+      }
+
+      if (nameEl) {
+        nameEl.addEventListener('input', () => scheduleSuggest(nameEl));
+        nameEl.addEventListener('change', tryAutofillByName);
+        nameEl.addEventListener('blur', tryAutofillByName);
+      }
+      if (phoneEl) {
+        phoneEl.addEventListener('input', () => scheduleSuggest(phoneEl));
+        phoneEl.addEventListener('change', tryAutofillByPhone);
+        phoneEl.addEventListener('blur', tryAutofillByPhone);
+      }
+
+      syncHidden();
+      refreshSelectedUI();
+      calcTotal();
+      refreshMinRuleUI();
+    })();
+</script>
